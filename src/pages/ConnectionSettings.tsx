@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { WifiHigh, WifiOff, NetworkIcon } from 'lucide-react';
+import { WifiHigh, WifiOff, NetworkIcon, Smartphone, Server } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 
 const ConnectionSettings = () => {
@@ -38,12 +39,34 @@ const ConnectionSettings = () => {
     setTempSettings({ ...tempSettings, protocol: e.target.value });
   };
   
+  const handleMacAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTempSettings({ ...tempSettings, deviceMacAddress: e.target.value });
+  };
+  
+  const handleDeviceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTempSettings({ ...tempSettings, deviceName: e.target.value });
+  };
+  
+  const handleRemoteModeChange = (checked: boolean) => {
+    setTempSettings({ ...tempSettings, remoteMode: checked });
+  };
+  
+  const handleChannelCountChange = (value: string) => {
+    setTempSettings({ ...tempSettings, channelCount: parseInt(value, 10) as 4 | 8 | 16 });
+  };
+  
   const saveSettings = () => {
     const isServerUrlChanged = tempSettings.serverUrl !== connectionSettings.serverUrl;
     const wasConnected = wsStatus === 'connected';
+    const channelCountChanged = tempSettings.channelCount !== connectionSettings.channelCount;
     
     // Update settings
     updateConnectionSettings(tempSettings);
+    
+    // If channel count changed, update the channel list
+    if (channelCountChanged && typeof tempSettings.channelCount === 'number') {
+      // This will trigger the channel count update in EegDataProvider
+    }
     
     // If server URL changed and we were connected, disconnect and reconnect
     if (isServerUrlChanged && wasConnected) {
@@ -111,12 +134,106 @@ const ConnectionSettings = () => {
         
         <Card>
           <CardHeader>
-            <CardTitle>EEG Device Connection</CardTitle>
+            <CardTitle>EEG Device Settings</CardTitle>
+            <CardDescription>
+              Configure device identification and channels
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="device-name">Device Name</Label>
+              <Input
+                id="device-name"
+                placeholder="My EEG Device"
+                value={tempSettings.deviceName}
+                onChange={handleDeviceNameChange}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="mac-address">MAC Address</Label>
+              <Input
+                id="mac-address"
+                placeholder="00:00:00:00:00:00"
+                value={tempSettings.deviceMacAddress}
+                onChange={handleMacAddressChange}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used to identify your device when connecting remotely
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="channel-count">Channel Count</Label>
+              <Select 
+                value={tempSettings.channelCount.toString()} 
+                onValueChange={handleChannelCountChange}
+              >
+                <SelectTrigger id="channel-count">
+                  <SelectValue placeholder="Select channel count" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="4">4 Channels</SelectItem>
+                  <SelectItem value="8">8 Channels</SelectItem>
+                  <SelectItem value="16">16 Channels</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Select the number of EEG channels used by your device
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch 
+                id="remote-mode"
+                checked={tempSettings.remoteMode}
+                onCheckedChange={handleRemoteModeChange}
+              />
+              <Label htmlFor="remote-mode" className="cursor-pointer">
+                Enable Remote Monitoring
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Allow monitoring from different WiFi networks
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>WebSocket Connection</CardTitle>
             <CardDescription>
               Configure how to connect to your EEG device
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="connection-type">Connection Type</Label>
+              <RadioGroup 
+                defaultValue={tempSettings.remoteMode ? "remote" : "local"}
+                className="flex space-x-4" 
+                onValueChange={(value) => setTempSettings({
+                  ...tempSettings, 
+                  remoteMode: value === "remote"
+                })}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="local" id="local" />
+                  <Label htmlFor="local" className="cursor-pointer flex items-center">
+                    <Smartphone className="h-4 w-4 mr-1" />
+                    Local
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="remote" id="remote" />
+                  <Label htmlFor="remote" className="cursor-pointer flex items-center">
+                    <Server className="h-4 w-4 mr-1" />
+                    Remote
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="server-url">WebSocket URL</Label>
               <Input

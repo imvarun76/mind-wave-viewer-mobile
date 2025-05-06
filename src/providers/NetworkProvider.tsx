@@ -45,24 +45,30 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Set up listeners
     const setupNetworkListener = async () => {
-      networkListenerRef.current = await Network.addListener("networkStatusChange", (status) => {
-        console.log("Network status changed:", status);
-        setStatus(status);
+      try {
+        const listener = await Network.addListener("networkStatusChange", (status) => {
+          console.log("Network status changed:", status);
+          setStatus(status);
+          
+          if (!status.connected) {
+            toast({
+              title: "Network Disconnected",
+              description: "You've lost network connection. EEG signals may not update.",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Network Connected",
+              description: `Connected via ${status.connectionType}`,
+              variant: "default"
+            });
+          }
+        });
         
-        if (!status.connected) {
-          toast({
-            title: "Network Disconnected",
-            description: "You've lost network connection. EEG signals may not update.",
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Network Connected",
-            description: `Connected via ${status.connectionType}`,
-            variant: "default"
-          });
-        }
-      });
+        networkListenerRef.current = listener;
+      } catch (error) {
+        console.error("Failed to set up network listener:", error);
+      }
     };
     
     setupNetworkListener();
@@ -70,7 +76,11 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       // Cleanup listener when component unmounts
       if (networkListenerRef.current) {
-        networkListenerRef.current.remove();
+        try {
+          networkListenerRef.current.remove();
+        } catch (error) {
+          console.error("Error removing network listener:", error);
+        }
       }
     };
   }, []);

@@ -19,6 +19,10 @@ export type ConnectionSettings = {
   autoConnect: boolean;
   reconnectInterval: number;
   dataFormat: 'json' | 'binary' | 'csv';
+  deviceMacAddress: string;
+  channelCount: 4 | 8 | 16;
+  remoteMode: boolean;
+  deviceName: string;
 };
 
 // Define the type for the EEG data context
@@ -38,6 +42,8 @@ type EegDataContextType = {
   toggleRecording: () => void;
   setTimeWindow: (seconds: number) => void;
   resetData: () => void;
+  setChannelCount: (count: 4 | 8 | 16) => void;
+  updateAllChannelData: (data: number[]) => void;
 };
 
 // Initial channel colors (from tailwind config)
@@ -50,15 +56,29 @@ const channelColors = [
   '#EC4899', // Pink
   '#14B8A6', // Teal
   '#F97316', // Orange
+  // Additional colors for 16 channels
+  '#4F46E5', // Indigo
+  '#0EA5E9', // Sky
+  '#0891B2', // Cyan
+  '#059669', // Emerald
+  '#84CC16', // Lime
+  '#EAB308', // Amber
+  '#D97706', // Amber Dark
+  '#DC2626', // Red Dark
 ];
 
-// Initial channels configuration
-const initialChannels: EegChannel[] = [
-  { id: 1, name: 'Channel 1', color: channelColors[0], visible: true, data: [], min: -100, max: 100 },
-  { id: 2, name: 'Channel 2', color: channelColors[1], visible: true, data: [], min: -100, max: 100 },
-  { id: 3, name: 'Channel 3', color: channelColors[2], visible: true, data: [], min: -100, max: 100 },
-  { id: 4, name: 'Channel 4', color: channelColors[3], visible: true, data: [], min: -100, max: 100 },
-];
+// Generate channels based on count
+const generateChannels = (count: number): EegChannel[] => {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    name: `Channel ${i + 1}`,
+    color: channelColors[i % channelColors.length],
+    visible: true,
+    data: [],
+    min: -100,
+    max: 100
+  }));
+};
 
 // Initial connection settings
 const initialConnectionSettings: ConnectionSettings = {
@@ -67,6 +87,10 @@ const initialConnectionSettings: ConnectionSettings = {
   autoConnect: false,
   reconnectInterval: 5000,
   dataFormat: 'json',
+  deviceMacAddress: '',
+  channelCount: 4,
+  remoteMode: false,
+  deviceName: 'EEG Device',
 };
 
 const EegDataContext = createContext<EegDataContextType | undefined>(undefined);
@@ -75,7 +99,7 @@ export const EegDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [channels, setChannels] = useState<EegChannel[]>(() => {
     // Try to load channels from localStorage
     const savedChannels = localStorage.getItem('eeg-channels');
-    return savedChannels ? JSON.parse(savedChannels) : initialChannels;
+    return savedChannels ? JSON.parse(savedChannels) : generateChannels(4);
   });
   
   const [connectionSettings, setConnectionSettings] = useState<ConnectionSettings>(() => {
@@ -122,6 +146,62 @@ export const EegDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setChannels(prev => prev.filter(channel => channel.id !== channelId));
   }, []);
   
+  // Function to set channel count (4, 8, or 16)
+  const setChannelCount = useCallback((count: 4 | 8 | 16) => {
+    setConnectionSettings(prev => ({ ...prev, channelCount: count }));
+    
+    // Generate new channels based on count
+    const newChannels = generateChannels(count);
+    
+    // Preserve existing channel settings when possible
+    setChannels(prev => {
+      return newChannels.map((newChannel, index) => {
+        const existingChannel = prev.find(c => c.id === newChannel.id);
+        if (existingChannel) {
+          return { 
+            ...newChannel, 
+            name: existingChannel.name, 
+            color: existingChannel.color,
+            min: existingChannel.min,
+            max: existingChannel.max,
+            visible: existingChannel.visible
+          };
+        }
+        return newChannel;
+      });
+    });
+    
+    toast({
+      title: "Channel Count Updated",
+      description: `Using ${count} EEG channels`,
+    });
+  }, []);
+  
+  // Function to update all channel data at once
+  const updateAllChannelData = useCallback((newData: number[]) => {
+    if (newData.length === 0) return;
+    
+    setChannels(prev => {
+      return prev.map((channel, index) => {
+        // Only update channels that have corresponding data
+        if (index < newData.length) {
+          const value = newData[index];
+          // Add the new data point to the channel
+          const newDataPoints = [...channel.data, value];
+          
+          // Keep only the last N points based on sampling rate and time window
+          const maxPoints = samplingRate * timeWindow;
+          const trimmedData = newDataPoints.length > maxPoints 
+            ? newDataPoints.slice(newDataPoints.length - maxPoints) 
+            : newDataPoints;
+          
+          return { ...channel, data: trimmedData };
+        }
+        return channel;
+      });
+    });
+  }, [samplingRate, timeWindow]);
+  
   // Function to update connection settings
   const updateConnectionSettings = useCallback((settings: Partial<ConnectionSettings>) => {
     setConnectionSettings(prev => ({ ...prev, ...settings }));
@@ -141,9 +221,21 @@ export const EegDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
       newSocket.onopen = () => {
         console.log('WebSocket connected');
         setWsStatus('connected');
+        
+        // If we have a MAC address, send it for device identification
+        if (connectionSettings.deviceMacAddress) {
+          const identificationMessage = JSON.stringify({
+            type: 'identify',
+            macAddress: connectionSettings.deviceMacAddress,
+            channelCount: connectionSettings.channelCount,
+            remoteMode: connectionSettings.remoteMode
+          });
+          newSocket.send(identificationMessage);
+        }
+        
         toast({
           title: "Connected to EEG Device",
-          description: `Connection established to ${connectionSettings.serverUrl}`,
+          description: connectionSettings.deviceName || `Connection established to ${connectionSettings.serverUrl}`,
         });
       };
       
@@ -177,6 +269,16 @@ export const EegDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
           switch (connectionSettings.dataFormat) {
             case 'json':
               data = JSON.parse(event.data);
+              // Check if the data has a specific format with device info
+              if (data.macAddress && data.deviceName) {
+                // Update device info if provided
+                updateConnectionSettings({
+                  deviceMacAddress: data.macAddress,
+                  deviceName: data.deviceName
+                });
+                // Extract the actual EEG data
+                data = data.data || [];
+              }
               break;
             case 'csv':
               data = event.data.split(',').map(Number);
@@ -190,27 +292,10 @@ export const EegDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
               data = JSON.parse(event.data);
           }
           
-          // Update channel data
-          setChannels(prev => {
-            return prev.map((channel, index) => {
-              // Only add data if we have data for this channel
-              if (data[index] !== undefined) {
-                const newData = [...channel.data, data[index]];
-                
-                // Keep only the last N points based on sampling rate and time window
-                const maxPoints = samplingRate * timeWindow;
-                const trimmedData = newData.length > maxPoints 
-                  ? newData.slice(newData.length - maxPoints) 
-                  : newData;
-                
-                return {
-                  ...channel,
-                  data: trimmedData,
-                };
-              }
-              return channel;
-            });
-          });
+          // Update all channel data at once
+          if (Array.isArray(data)) {
+            updateAllChannelData(data);
+          }
         } catch (error) {
           console.error('Error processing EEG data:', error);
         }
@@ -226,7 +311,7 @@ export const EegDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         variant: "destructive"
       });
     }
-  }, [connectionSettings, isRecording, socket, timeWindow, samplingRate]);
+  }, [connectionSettings, isRecording, socket, updateAllChannelData, updateConnectionSettings]);
   
   // Disconnect WebSocket
   const disconnectWebSocket = useCallback(() => {
@@ -274,6 +359,8 @@ export const EegDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     toggleRecording,
     setTimeWindow,
     resetData,
+    setChannelCount,
+    updateAllChannelData
   };
   
   return <EegDataContext.Provider value={value}>{children}</EegDataContext.Provider>;

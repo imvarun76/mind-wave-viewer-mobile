@@ -2,7 +2,7 @@
 import React from 'react';
 import { useEegData } from '@/providers/EegDataProvider';
 import { useNetwork } from '@/providers/NetworkProvider';
-import { WifiHigh, WifiOff, Signal } from 'lucide-react';
+import { WifiHigh, WifiOff, Signal, Smartphone, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -27,7 +27,7 @@ const ConnectionStatus: React.FC = () => {
     }
     
     switch (wsStatus) {
-      case 'connected': return 'Connected to EEG device';
+      case 'connected': return `Connected to ${connectionSettings.deviceName || 'EEG device'}`;
       case 'connecting': return 'Connecting to EEG device...';
       case 'error': return 'Connection error';
       default: return 'Disconnected';
@@ -85,8 +85,23 @@ const ConnectionStatus: React.FC = () => {
         </Button>
       </div>
       
-      <div className="mt-3 text-xs text-muted-foreground truncate">
-        Server: {connectionSettings.serverUrl}
+      <div className="mt-3 text-xs text-gray-500 space-y-1">
+        <div className="flex justify-between items-center">
+          <span className="flex items-center">
+            {connectionSettings.remoteMode ? 
+              <Server className="h-3 w-3 mr-1" /> : 
+              <Smartphone className="h-3 w-3 mr-1" />
+            }
+            {connectionSettings.remoteMode ? 'Remote Mode' : 'Local Mode'}
+          </span>
+          <span>{connectionSettings.channelCount} channels</span>
+        </div>
+        <div className="truncate">
+          {connectionSettings.deviceMacAddress ? 
+            `MAC: ${connectionSettings.deviceMacAddress}` : 
+            `Server: ${connectionSettings.serverUrl}`
+          }
+        </div>
       </div>
     </div>
   );
