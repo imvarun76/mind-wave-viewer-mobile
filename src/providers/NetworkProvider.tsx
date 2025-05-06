@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, { createContext, useState, useEffect, useContext, useRef } from "react";
 import { Network } from "@capacitor/network";
 import { toast } from "@/components/ui/use-toast";
 
@@ -20,6 +20,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
     connected: true, // Default to true since web browsers are typically connected
     connectionType: "unknown"
   });
+  const networkListenerRef = useRef<any>(null);
 
   const checkConnection = async (): Promise<NetworkStatus> => {
     try {
@@ -43,27 +44,34 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
     checkConnection();
 
     // Set up listeners
-    const networkListener = Network.addListener("networkStatusChange", (status) => {
-      console.log("Network status changed:", status);
-      setStatus(status);
-      
-      if (!status.connected) {
-        toast({
-          title: "Network Disconnected",
-          description: "You've lost network connection. EEG signals may not update.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Network Connected",
-          description: `Connected via ${status.connectionType}`,
-          variant: "default"
-        });
-      }
-    });
+    const setupNetworkListener = async () => {
+      networkListenerRef.current = await Network.addListener("networkStatusChange", (status) => {
+        console.log("Network status changed:", status);
+        setStatus(status);
+        
+        if (!status.connected) {
+          toast({
+            title: "Network Disconnected",
+            description: "You've lost network connection. EEG signals may not update.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Network Connected",
+            description: `Connected via ${status.connectionType}`,
+            variant: "default"
+          });
+        }
+      });
+    };
+    
+    setupNetworkListener();
 
     return () => {
-      networkListener.remove();
+      // Cleanup listener when component unmounts
+      if (networkListenerRef.current) {
+        networkListenerRef.current.remove();
+      }
     };
   }, []);
 
