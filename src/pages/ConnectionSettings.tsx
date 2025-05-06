@@ -52,7 +52,11 @@ const ConnectionSettings = () => {
   };
   
   const handleChannelCountChange = (value: string) => {
-    setTempSettings({ ...tempSettings, channelCount: parseInt(value, 10) as 4 | 8 | 16 });
+    // Make sure value is not undefined and convert to number
+    const channelCount = parseInt(value, 10);
+    if (!isNaN(channelCount) && (channelCount === 4 || channelCount === 8 || channelCount === 16)) {
+      setTempSettings({ ...tempSettings, channelCount: channelCount as 4 | 8 | 16 });
+    }
   };
   
   const saveSettings = () => {
@@ -166,7 +170,7 @@ const ConnectionSettings = () => {
             <div className="space-y-2">
               <Label htmlFor="channel-count">Channel Count</Label>
               <Select 
-                value={tempSettings.channelCount.toString()} 
+                value={tempSettings.channelCount ? tempSettings.channelCount.toString() : "4"} 
                 onValueChange={handleChannelCountChange}
               >
                 <SelectTrigger id="channel-count">
