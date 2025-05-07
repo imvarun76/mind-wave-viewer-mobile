@@ -11,9 +11,11 @@ import Index from "./pages/Index";
 import SignalViewer from "./pages/SignalViewer";
 import ConnectionSettings from "./pages/ConnectionSettings";
 import ChannelSettings from "./pages/ChannelSettings";
+import FirebaseDataView from "./pages/FirebaseDataView";
 import NotFound from "./pages/NotFound";
 import { NetworkProvider } from "./providers/NetworkProvider";
 import { EegDataProvider } from "./providers/EegDataProvider";
+import { FirebaseDataProvider } from "./providers/FirebaseDataProvider";
 
 const queryClient = new QueryClient();
 
@@ -40,17 +42,20 @@ const App = () => {
       <TooltipProvider>
         <NetworkProvider>
           <EegDataProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/viewer" element={<SignalViewer />} />
-                <Route path="/settings/connection" element={<ConnectionSettings />} />
-                <Route path="/settings/channels" element={<ChannelSettings />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
+            <FirebaseDataProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/viewer" element={<SignalViewer />} />
+                  <Route path="/settings/connection" element={<ConnectionSettings />} />
+                  <Route path="/settings/channels" element={<ChannelSettings />} />
+                  <Route path="/firebase-data" element={<FirebaseDataView />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </FirebaseDataProvider>
           </EegDataProvider>
         </NetworkProvider>
       </TooltipProvider>
