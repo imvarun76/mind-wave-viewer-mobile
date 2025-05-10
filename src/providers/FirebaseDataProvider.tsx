@@ -8,6 +8,10 @@ export type FirebaseEegData = {
   spo2?: number;
   temp?: number;
   timestamp?: number;
+  eeg?: number[][];  // For EEG data (array of channels, each with array of values)
+  channels?: {
+    [key: string]: number[];  // Channel name to array of values
+  };
 };
 
 // Define the context type
@@ -31,7 +35,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [pollingInterval, setPollingInterval] = useState<number>(5000); // Default to 5 seconds
+  const [pollingInterval, setPollingInterval] = useState<number>(1000); // Default to 1 second
   const [pollingId, setPollingId] = useState<number | null>(null);
 
   // Function to fetch data from Firebase
@@ -106,7 +110,9 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     toast({
       title: "Polling Interval Updated",
       description: interval > 0 
-        ? `Data will refresh every ${interval/1000} seconds` 
+        ? interval < 1000 
+          ? `Data will refresh every ${interval} milliseconds` 
+          : `Data will refresh every ${interval/1000} seconds`
         : "Automatic polling disabled",
     });
   };

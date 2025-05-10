@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, Heart, ThermometerSun } from 'lucide-react';
 import PollingControls from '@/components/PollingControls';
+import WaveformChart from '@/components/WaveformChart';
 
 const FirebaseDataView = () => {
   const { data, isLoading, lastUpdated, refreshData } = useFirebaseData();
@@ -78,6 +79,8 @@ const FirebaseDataView = () => {
             </div>
           </CardContent>
         </Card>
+        
+        <WaveformChart />
         
         <PollingControls />
         

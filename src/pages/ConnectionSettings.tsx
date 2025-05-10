@@ -17,7 +17,13 @@ const ConnectionSettings = () => {
   const { connectionSettings, updateConnectionSettings, wsStatus, connectWebSocket, disconnectWebSocket } = useEegData();
   const { status: networkStatus, checkConnection } = useNetwork();
   
-  const [tempSettings, setTempSettings] = useState({ ...connectionSettings });
+  // Initialize with default to remote mode for Firebase connectivity
+  const [tempSettings, setTempSettings] = useState({ 
+    ...connectionSettings,
+    remoteMode: true, // Default to remote mode
+    serverUrl: connectionSettings.serverUrl || "https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/esp32_001.json",
+    reconnectInterval: connectionSettings.reconnectInterval || 1000, // Set to 1 second default
+  });
   
   const handleServerUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTempSettings({ ...tempSettings, serverUrl: e.target.value });
@@ -98,6 +104,15 @@ const ConnectionSettings = () => {
     });
   };
   
+  // Safely determine channel count for select value
+  const getChannelCountValue = () => {
+    const count = tempSettings.channelCount;
+    if (count === 4 || count === 8 || count === 16) {
+      return count.toString();
+    }
+    return "8"; // Default to 8 channels if invalid
+  };
+  
   return (
     <MobileLayout title="Connection Settings" showBack={true} backTo="/">
       <div className="space-y-4">
@@ -170,7 +185,7 @@ const ConnectionSettings = () => {
             <div className="space-y-2">
               <Label htmlFor="channel-count">Channel Count</Label>
               <Select 
-                value={tempSettings.channelCount ? tempSettings.channelCount.toString() : "4"} 
+                value={getChannelCountValue()} 
                 onValueChange={handleChannelCountChange}
               >
                 <SelectTrigger id="channel-count">
@@ -242,12 +257,12 @@ const ConnectionSettings = () => {
               <Label htmlFor="server-url">WebSocket URL</Label>
               <Input
                 id="server-url"
-                placeholder="ws://192.168.1.100:8080"
+                placeholder="https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/esp32_001.json"
                 value={tempSettings.serverUrl}
                 onChange={handleServerUrlChange}
               />
               <p className="text-xs text-muted-foreground">
-                Format: ws://ip-address:port or wss://domain
+                Format: ws://ip-address:port, wss://domain, or https:// for REST APIs
               </p>
             </div>
             
@@ -284,19 +299,23 @@ const ConnectionSettings = () => {
             <div className="space-y-2">
               <Label htmlFor="reconnect-interval">Reconnect Interval</Label>
               <Select 
-                value={tempSettings.reconnectInterval.toString()} 
+                value={tempSettings.reconnectInterval ? tempSettings.reconnectInterval.toString() : "1000"} 
                 onValueChange={handleReconnectIntervalChange}
               >
                 <SelectTrigger id="reconnect-interval">
                   <SelectValue placeholder="Select reconnect interval" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="200">200 milliseconds</SelectItem>
+                  <SelectItem value="500">500 milliseconds</SelectItem>
                   <SelectItem value="1000">1 second</SelectItem>
                   <SelectItem value="3000">3 seconds</SelectItem>
                   <SelectItem value="5000">5 seconds</SelectItem>
-                  <SelectItem value="10000">10 seconds</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Set to 200ms or 500ms for smoother waveform updates
+              </p>
             </div>
             
             <div className="flex items-center space-x-2">

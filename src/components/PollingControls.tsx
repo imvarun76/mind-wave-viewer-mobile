@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 const PollingControls = () => {
   const { setPollingInterval } = useFirebaseData();
   const [isPollingEnabled, setIsPollingEnabled] = useState<boolean>(true);
-  const [interval, setInterval] = useState<number>(5);
+  const [interval, setInterval] = useState<number>(1);
   
   const handlePollingToggle = (enabled: boolean) => {
     setIsPollingEnabled(enabled);
@@ -25,7 +25,9 @@ const PollingControls = () => {
     const newInterval = values[0];
     setInterval(newInterval);
     if (isPollingEnabled) {
-      setPollingInterval(newInterval * 1000);
+      // Convert to milliseconds, with special handling for values under 1
+      const msInterval = newInterval < 1 ? newInterval * 1000 : newInterval * 1000;
+      setPollingInterval(msInterval);
     }
   };
   
@@ -50,21 +52,23 @@ const PollingControls = () => {
         <div className="space-y-2">
           <div className="flex justify-between">
             <Label htmlFor="polling-interval">Polling Interval</Label>
-            <span className="text-sm font-medium">{interval} seconds</span>
+            <span className="text-sm font-medium">
+              {interval < 1 ? `${interval * 1000} ms` : `${interval} seconds`}
+            </span>
           </div>
           <Slider
             id="polling-interval"
             disabled={!isPollingEnabled}
-            min={1}
-            max={60}
-            step={1}
+            min={0.2}
+            max={5}
+            step={0.1}
             value={[interval]}
             onValueChange={handleIntervalChange}
           />
           <div className="flex justify-between text-xs text-muted-foreground">
+            <span>200ms</span>
             <span>1s</span>
-            <span>30s</span>
-            <span>60s</span>
+            <span>5s</span>
           </div>
         </div>
       </CardContent>
