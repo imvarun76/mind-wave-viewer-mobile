@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import MobileLayout from '@/components/MobileLayout';
 import { useEegData } from '@/providers/EegDataProvider';
@@ -17,12 +16,12 @@ const ConnectionSettings = () => {
   const { connectionSettings, updateConnectionSettings, wsStatus, connectWebSocket, disconnectWebSocket } = useEegData();
   const { status: networkStatus, checkConnection } = useNetwork();
   
-  // Initialize with default to remote mode for Firebase connectivity
+  // Initialize with default settings
   const [tempSettings, setTempSettings] = useState({ 
     ...connectionSettings,
     remoteMode: true, // Default to remote mode
-    serverUrl: connectionSettings.serverUrl || "https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/esp32_001.json",
-    reconnectInterval: connectionSettings.reconnectInterval || 1000, // Set to 1 second default
+    serverUrl: connectionSettings.serverUrl || "https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/eeg_data.json",
+    reconnectInterval: connectionSettings.reconnectInterval || 500, // Set to 500ms default for smoother updates
   });
   
   const handleServerUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,15 +253,15 @@ const ConnectionSettings = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="server-url">WebSocket URL</Label>
+              <Label htmlFor="server-url">Firebase URL</Label>
               <Input
                 id="server-url"
-                placeholder="https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/esp32_001.json"
+                placeholder="https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/eeg_data.json"
                 value={tempSettings.serverUrl}
                 onChange={handleServerUrlChange}
               />
               <p className="text-xs text-muted-foreground">
-                Format: ws://ip-address:port, wss://domain, or https:// for REST APIs
+                Format: https://[your-firebase-project].firebasedatabase.app/path/to/data.json
               </p>
             </div>
             
@@ -273,7 +272,13 @@ const ConnectionSettings = () => {
                 placeholder="eeg-protocol"
                 value={tempSettings.protocol}
                 onChange={handleProtocolChange}
+                disabled={tempSettings.remoteMode}
               />
+              <p className="text-xs text-muted-foreground">
+                {tempSettings.remoteMode ? 
+                  "Not used with Firebase Remote connection" : 
+                  "Only needed for custom WebSocket connections"}
+              </p>
             </div>
             
             <div className="space-y-2">
@@ -292,18 +297,18 @@ const ConnectionSettings = () => {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Select the format that matches your ESP32 data transmission
+                Select the format that matches your Firebase data format
               </p>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="reconnect-interval">Reconnect Interval</Label>
+              <Label htmlFor="reconnect-interval">Polling Interval</Label>
               <Select 
-                value={tempSettings.reconnectInterval ? tempSettings.reconnectInterval.toString() : "1000"} 
+                value={tempSettings.reconnectInterval ? tempSettings.reconnectInterval.toString() : "500"} 
                 onValueChange={handleReconnectIntervalChange}
               >
                 <SelectTrigger id="reconnect-interval">
-                  <SelectValue placeholder="Select reconnect interval" />
+                  <SelectValue placeholder="Select polling interval" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="200">200 milliseconds</SelectItem>

@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 const PollingControls = () => {
   const { setPollingInterval } = useFirebaseData();
   const [isPollingEnabled, setIsPollingEnabled] = useState<boolean>(true);
-  const [interval, setInterval] = useState<number>(1);
+  const [interval, setInterval] = useState<number>(0.5); // Default to 500ms
   
   const handlePollingToggle = (enabled: boolean) => {
     setIsPollingEnabled(enabled);
@@ -25,8 +25,8 @@ const PollingControls = () => {
     const newInterval = values[0];
     setInterval(newInterval);
     if (isPollingEnabled) {
-      // Convert to milliseconds, with special handling for values under 1
-      const msInterval = newInterval < 1 ? newInterval * 1000 : newInterval * 1000;
+      // Convert to milliseconds
+      const msInterval = newInterval * 1000;
       setPollingInterval(msInterval);
     }
   };

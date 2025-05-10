@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { toast } from '@/components/ui/use-toast';
 
@@ -8,6 +7,16 @@ export type FirebaseEegData = {
   spo2?: number;
   temp?: number;
   timestamp?: number;
+  // Channel data in flat format (ch1, ch2, etc.)
+  ch1?: number;
+  ch2?: number;
+  ch3?: number;
+  ch4?: number;
+  ch5?: number;
+  ch6?: number;
+  ch7?: number;
+  ch8?: number;
+  // Support for array format too
   eeg?: number[][];  // For EEG data (array of channels, each with array of values)
   channels?: {
     [key: string]: number[];  // Channel name to array of values
@@ -27,8 +36,8 @@ type FirebaseDataContextType = {
 // Create the context
 const FirebaseDataContext = createContext<FirebaseDataContextType | undefined>(undefined);
 
-// Firebase API endpoint
-const FIREBASE_API_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/esp32_001.json';
+// Firebase API endpoint - updated to use eeg_data.json
+const FIREBASE_API_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/eeg_data.json';
 
 export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<FirebaseEegData>({});

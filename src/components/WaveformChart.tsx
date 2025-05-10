@@ -1,11 +1,11 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useFirebaseData } from '@/providers/FirebaseDataProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/components/ui/use-toast';
 
 // Define channel colors for consistent visualization
 const CHANNEL_COLORS = [
@@ -27,6 +27,9 @@ const CHANNEL_COLORS = [
   "#FFBD33", // Gold
 ];
 
+// Maximum number of data points to keep in history
+const MAX_HISTORY_POINTS = 50;
+
 const WaveformChart: React.FC = () => {
   const { data, isLoading } = useFirebaseData();
   const [visibleChannels, setVisibleChannels] = useState<{ [key: string]: boolean }>({
@@ -40,71 +43,61 @@ const WaveformChart: React.FC = () => {
     ch8: true,
   });
   
+  // State to keep track of historical data
+  const [dataHistory, setDataHistory] = useState<Array<any>>([]);
+  
+  // Update history when new data comes in
+  useEffect(() => {
+    if (!data || !data.timestamp) return;
+    
+    // Check if we have channel data in the flat format
+    const hasChannelData = 
+      data.ch1 !== undefined || 
+      data.ch2 !== undefined || 
+      data.ch3 !== undefined || 
+      data.ch4 !== undefined;
+    
+    if (!hasChannelData) return;
+    
+    // Add new data point to history
+    setDataHistory(prevHistory => {
+      // Create new data point with timestamp and channel values
+      const newPoint = {
+        time: data.timestamp,
+        ch1: data.ch1,
+        ch2: data.ch2,
+        ch3: data.ch3,
+        ch4: data.ch4,
+        ch5: data.ch5,
+        ch6: data.ch6,
+        ch7: data.ch7,
+        ch8: data.ch8,
+      };
+      
+      // Add to history and limit size
+      const updatedHistory = [...prevHistory, newPoint];
+      if (updatedHistory.length > MAX_HISTORY_POINTS) {
+        return updatedHistory.slice(updatedHistory.length - MAX_HISTORY_POINTS);
+      }
+      return updatedHistory;
+    });
+  }, [data]);
+  
   // Toggle channel visibility
   const toggleChannel = (channelName: string) => {
     setVisibleChannels(prev => ({
       ...prev,
       [channelName]: !prev[channelName]
     }));
-  };
-  
-  // Prepare data for the chart
-  const prepareChartData = () => {
-    // If we have structured channel data
-    if (data.channels) {
-      // Get maximum data points to show (based on longest channel)
-      const maxDataPoints = Object.values(data.channels).reduce(
-        (max, points) => Math.max(max, points.length), 
-        0
-      );
-      
-      // Create data points for each time step
-      return Array.from({ length: maxDataPoints }, (_, i) => {
-        const point: any = { time: i };
-        
-        // Add value for each channel at this time point
-        Object.entries(data.channels).forEach(([channel, values]) => {
-          if (i < values.length) {
-            point[channel] = values[i];
-          }
-        });
-        
-        return point;
-      });
-    } 
-    // If we have flat EEG arrays
-    else if (data.eeg && data.eeg.length > 0) {
-      // Get maximum data points
-      const maxDataPoints = data.eeg.reduce(
-        (max, channel) => Math.max(max, channel.length), 
-        0
-      );
-      
-      // Create data points for each time step
-      return Array.from({ length: maxDataPoints }, (_, i) => {
-        const point: any = { time: i };
-        
-        // Add value for each channel at this time point
-        data.eeg.forEach((channel, channelIdx) => {
-          const channelName = `ch${channelIdx + 1}`;
-          if (i < channel.length) {
-            point[channelName] = channel[i];
-          }
-        });
-        
-        return point;
-      });
-    }
     
-    // No valid data
-    return [];
+    toast({
+      title: `Channel ${channelName}`,
+      description: visibleChannels[channelName] ? "Hidden from chart" : "Now visible on chart",
+    });
   };
   
-  const chartData = prepareChartData();
-  
-  // Check if we have any channel data
-  const hasChannelData = (data.channels && Object.keys(data.channels).length > 0) || 
-                         (data.eeg && data.eeg.length > 0);
+  // Check if we have any channel data to display
+  const hasChannelData = dataHistory.length > 0;
   
   return (
     <Card>
@@ -112,11 +105,11 @@ const WaveformChart: React.FC = () => {
         <CardTitle className="text-lg">EEG Waveforms</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isLoading && dataHistory.length === 0 ? (
           <Skeleton className="h-[300px] w-full" />
         ) : !hasChannelData ? (
           <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground">
-            No waveform data available. Make sure your Firebase data includes 'eeg' or 'channels' properties.
+            No waveform data available yet. Waiting for channel data from Firebase...
           </div>
         ) : (
           <>
@@ -145,16 +138,22 @@ const WaveformChart: React.FC = () => {
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={chartData}
+                  data={dataHistory}
                   margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
+                  <XAxis dataKey="time" 
+                         type="number"
+                         domain={['dataMin', 'dataMax']} 
+                         tickFormatter={(value) => value.toString().slice(-4)} />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip 
+                    formatter={(value, name) => [`${value}`, `${name}`]}
+                    labelFormatter={(value) => `Timestamp: ${value}`}
+                  />
                   <Legend />
                   {Object.keys(visibleChannels).map((channel, index) => (
-                    visibleChannels[channel] && (
+                    visibleChannels[channel] && dataHistory.some(point => point[channel] !== undefined) && (
                       <Line
                         key={channel}
                         type="monotone"
