@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { toast } from '@/components/ui/use-toast';
 
@@ -23,9 +24,15 @@ export type FirebaseEegData = {
   };
 };
 
+// Define a type for timestamped data from Firebase
+export type FirebaseTimestampedData = {
+  [timestamp: string]: FirebaseEegData;
+};
+
 // Define the context type
 type FirebaseDataContextType = {
   data: FirebaseEegData;
+  rawTimeseriesData: FirebaseTimestampedData;
   isLoading: boolean;
   error: string | null;
   lastUpdated: Date | null;
@@ -36,16 +43,21 @@ type FirebaseDataContextType = {
 // Create the context
 const FirebaseDataContext = createContext<FirebaseDataContextType | undefined>(undefined);
 
-// Firebase API endpoint - updated to use eeg_data.json
-const FIREBASE_API_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/eeg_data.json';
+// Firebase API endpoint - updated to use ordered query
+const FIREBASE_API_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/eeg_data_log.json?orderBy="$key"&limitToLast=50';
+
+// Fallback to single data point if log endpoint doesn't work
+const FIREBASE_FALLBACK_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/eeg_data.json';
 
 export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<FirebaseEegData>({});
+  const [rawTimeseriesData, setRawTimeseriesData] = useState<FirebaseTimestampedData>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [pollingInterval, setPollingInterval] = useState<number>(1000); // Default to 1 second
   const [pollingId, setPollingId] = useState<number | null>(null);
+  const [useLogEndpoint, setUseLogEndpoint] = useState<boolean>(true);
 
   // Function to fetch data from Firebase
   const fetchData = async () => {
@@ -53,20 +65,51 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setError(null);
     
     try {
-      const response = await fetch(FIREBASE_API_URL);
+      // First try the log endpoint
+      const url = useLogEndpoint ? FIREBASE_API_URL : FIREBASE_FALLBACK_URL;
+      const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
       
-      const result: FirebaseEegData = await response.json();
-      setData(result);
+      const result = await response.json();
+      
+      if (useLogEndpoint && result) {
+        // We're using the log endpoint and got data
+        setRawTimeseriesData(result || {});
+        
+        // Extract the latest data point for backward compatibility
+        const timestamps = Object.keys(result || {}).sort();
+        if (timestamps.length > 0) {
+          const latestTimestamp = timestamps[timestamps.length - 1];
+          setData(result[latestTimestamp] || {});
+        }
+      } else if (!useLogEndpoint && result) {
+        // Using the fallback endpoint
+        setData(result || {});
+        // Update timeseries with a single point
+        const timestamp = Date.now().toString();
+        setRawTimeseriesData({ [timestamp]: result || {} });
+      } else if (useLogEndpoint && !result) {
+        // Log endpoint returned no data, try fallback next time
+        console.log("Log endpoint returned no data, switching to fallback endpoint");
+        setUseLogEndpoint(false);
+      }
+      
       setLastUpdated(new Date());
       
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       setError(errorMessage);
+      
+      // If we got an error with the log endpoint, try the fallback next time
+      if (useLogEndpoint) {
+        console.log("Error with log endpoint, switching to fallback endpoint");
+        setUseLogEndpoint(false);
+      }
+      
       toast({
         title: "Data Fetch Error",
         description: errorMessage,
@@ -111,7 +154,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
         window.clearInterval(pollingId);
       }
     };
-  }, [pollingInterval]);
+  }, [pollingInterval, useLogEndpoint]);
 
   // Handler for changing the polling interval
   const handleSetPollingInterval = (interval: number) => {
@@ -128,6 +171,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const value = {
     data,
+    rawTimeseriesData,
     isLoading,
     error,
     lastUpdated,

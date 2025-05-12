@@ -10,7 +10,7 @@ import PollingControls from '@/components/PollingControls';
 import EegWaveformViewer from '@/components/EegWaveformViewer';
 
 const FirebaseDataView = () => {
-  const { data, isLoading, lastUpdated, refreshData } = useFirebaseData();
+  const { data, rawTimeseriesData, isLoading, lastUpdated, refreshData } = useFirebaseData();
   
   return (
     <MobileLayout 
@@ -93,7 +93,7 @@ const FirebaseDataView = () => {
               {isLoading ? (
                 <Skeleton className="h-20 w-full" />
               ) : (
-                JSON.stringify(data, null, 2)
+                JSON.stringify(rawTimeseriesData, null, 2)
               )}
             </pre>
           </CardContent>

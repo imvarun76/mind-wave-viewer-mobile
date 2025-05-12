@@ -59,17 +59,21 @@ const PollingControls = () => {
           <Slider
             id="polling-interval"
             disabled={!isPollingEnabled}
-            min={0.2}
+            min={0.1}
             max={5}
             step={0.1}
             value={[interval]}
             onValueChange={handleIntervalChange}
           />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>200ms</span>
+            <span>100ms</span>
             <span>1s</span>
             <span>5s</span>
           </div>
+        </div>
+        
+        <div className="text-xs text-muted-foreground">
+          <p>Faster polling (100-200ms) provides smoother waveforms but increases data usage.</p>
         </div>
       </CardContent>
     </Card>

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirebaseData } from '@/providers/FirebaseDataProvider';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -6,6 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Define channel colors for consistent visualization
 const CHANNEL_COLORS = [
@@ -19,11 +22,8 @@ const CHANNEL_COLORS = [
   "#8B33FF", // Purple
 ];
 
-// Maximum number of data points to keep in history
-const MAX_HISTORY_POINTS = 100;
-
 const EegWaveformViewer = () => {
-  const { data, isLoading, lastUpdated } = useFirebaseData();
+  const { rawTimeseriesData, isLoading, lastUpdated } = useFirebaseData();
   const [visibleChannels, setVisibleChannels] = useState<{ [key: string]: boolean }>({
     ch1: true,
     ch2: true,
@@ -36,44 +36,34 @@ const EegWaveformViewer = () => {
   });
   
   const [smoothing, setSmoothing] = useState<'none' | 'low' | 'medium' | 'high'>('medium');
-  const [dataHistory, setDataHistory] = useState<Array<any>>([]);
+  const [chartData, setChartData] = useState<Array<any>>([]);
   
-  // Update history when new data comes in
-  React.useEffect(() => {
-    if (!data || !data.timestamp) return;
+  // Convert Firebase timeseries data to chart-friendly format
+  useEffect(() => {
+    if (!rawTimeseriesData || Object.keys(rawTimeseriesData).length === 0) return;
     
-    // Check if we have channel data in the flat format
-    const hasChannelData = 
-      data.ch1 !== undefined || 
-      data.ch2 !== undefined || 
-      data.ch3 !== undefined || 
-      data.ch4 !== undefined;
+    // Sort timestamps to ensure chronological order
+    const timestamps = Object.keys(rawTimeseriesData).sort();
     
-    if (!hasChannelData) return;
-    
-    // Add new data point to history
-    setDataHistory(prevHistory => {
-      // Create new data point with timestamp and channel values
-      const newPoint = {
-        time: data.timestamp,
-        ch1: data.ch1,
-        ch2: data.ch2,
-        ch3: data.ch3,
-        ch4: data.ch4,
-        ch5: data.ch5,
-        ch6: data.ch6,
-        ch7: data.ch7,
-        ch8: data.ch8,
+    // Convert to array format for the chart
+    const formattedData = timestamps.map(timestamp => {
+      const dataPoint = rawTimeseriesData[timestamp];
+      return {
+        time: parseInt(timestamp),
+        timestamp,
+        ch1: dataPoint.ch1,
+        ch2: dataPoint.ch2,
+        ch3: dataPoint.ch3,
+        ch4: dataPoint.ch4,
+        ch5: dataPoint.ch5,
+        ch6: dataPoint.ch6,
+        ch7: dataPoint.ch7,
+        ch8: dataPoint.ch8,
       };
-      
-      // Add to history and limit size
-      const updatedHistory = [...prevHistory, newPoint];
-      if (updatedHistory.length > MAX_HISTORY_POINTS) {
-        return updatedHistory.slice(updatedHistory.length - MAX_HISTORY_POINTS);
-      }
-      return updatedHistory;
     });
-  }, [data]);
+    
+    setChartData(formattedData);
+  }, [rawTimeseriesData]);
   
   // Function to toggle channel visibility
   const toggleChannel = (channelName: string) => {
@@ -85,8 +75,8 @@ const EegWaveformViewer = () => {
   
   // Apply smoothing to the data
   const getSmoothedData = () => {
-    if (smoothing === 'none' || dataHistory.length <= 2) {
-      return dataHistory;
+    if (smoothing === 'none' || chartData.length <= 2) {
+      return chartData;
     }
     
     // Get smoothing window size based on selected level
@@ -96,14 +86,14 @@ const EegWaveformViewer = () => {
       5; // high
     
     // If we don't have enough points for the window, return original data
-    if (dataHistory.length <= windowSize) {
-      return dataHistory;
+    if (chartData.length <= windowSize) {
+      return chartData;
     }
     
     // Apply moving average smoothing
-    return dataHistory.map((point, index) => {
+    return chartData.map((point, index) => {
       // For first and last few points, return as-is (not enough surrounding points)
-      if (index < windowSize/2 || index >= dataHistory.length - windowSize/2) {
+      if (index < windowSize/2 || index >= chartData.length - windowSize/2) {
         return point;
       }
       
@@ -117,10 +107,10 @@ const EegWaveformViewer = () => {
         
         // Calculate sum of points in window
         for (let i = Math.max(0, index - Math.floor(windowSize/2)); 
-             i <= Math.min(dataHistory.length - 1, index + Math.floor(windowSize/2)); 
+             i <= Math.min(chartData.length - 1, index + Math.floor(windowSize/2)); 
              i++) {
-          if (dataHistory[i][channel] !== undefined) {
-            sum += dataHistory[i][channel];
+          if (chartData[i][channel] !== undefined) {
+            sum += chartData[i][channel];
             count++;
           }
         }
@@ -136,13 +126,13 @@ const EegWaveformViewer = () => {
   };
   
   const smoothedData = getSmoothedData();
-  const hasChannelData = dataHistory.length > 0;
+  const hasChannelData = chartData.length > 0;
   
   const renderCustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-2 border border-gray-200 shadow-sm rounded-md">
-          <p className="text-xs font-medium">Time: {label}</p>
+          <p className="text-xs font-medium">Time: {new Date(label).toLocaleTimeString()}</p>
           {payload.map((entry: any) => (
             <p key={entry.name} className="text-xs" style={{ color: entry.color }}>
               {entry.name}: {Math.round(entry.value * 100) / 100}
@@ -158,7 +148,7 @@ const EegWaveformViewer = () => {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex justify-between items-center">
-          <span>Enhanced EEG Waveforms</span>
+          <span>EEG Waveforms</span>
           {lastUpdated && (
             <span className="text-xs font-normal text-muted-foreground">
               Updated: {lastUpdated.toLocaleTimeString()}
@@ -206,11 +196,19 @@ const EegWaveformViewer = () => {
           </div>
         </div>
         
-        {isLoading && dataHistory.length === 0 ? (
+        {isLoading && chartData.length === 0 ? (
           <Skeleton className="h-[300px] w-full" />
         ) : !hasChannelData ? (
-          <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground">
-            No waveform data available yet. Waiting for channel data from Firebase...
+          <div className="space-y-4">
+            <Alert variant="warning">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No waveform data available. Make sure data is being sent to the correct Firebase endpoint (eeg_data_log).
+              </AlertDescription>
+            </Alert>
+            <div className="h-[260px] w-full flex items-center justify-center text-muted-foreground">
+              Waiting for EEG data from Firebase...
+            </div>
           </div>
         ) : (
           <div className="h-[300px] w-full">
@@ -223,8 +221,8 @@ const EegWaveformViewer = () => {
                 <XAxis 
                   dataKey="time" 
                   type="number"
-                  domain={['dataMin', 'dataMax']} 
-                  tickFormatter={(value) => value.toString().slice(-4)}
+                  domain={['auto', 'auto']} 
+                  tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
                   stroke="#888888" 
                   fontSize={10}
                 />
@@ -254,8 +252,8 @@ const EegWaveformViewer = () => {
         )}
         
         <div className="mt-2 text-xs text-muted-foreground text-right">
-          {dataHistory.length > 0 && (
-            <span>{dataHistory.length} data points | {MAX_HISTORY_POINTS} max</span>
+          {chartData.length > 0 && (
+            <span>{chartData.length} data points from Firebase</span>
           )}
         </div>
       </CardContent>
