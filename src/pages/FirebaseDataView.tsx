@@ -1,16 +1,22 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useFirebaseData } from '@/providers/FirebaseDataProvider';
 import MobileLayout from '@/components/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, Heart, ThermometerSun } from 'lucide-react';
+import { RefreshCw, Heart, ThermometerSun, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import PollingControls from '@/components/PollingControls';
 import EegWaveformViewer from '@/components/EegWaveformViewer';
 
 const FirebaseDataView = () => {
   const { data, rawTimeseriesData, isLoading, lastUpdated, refreshData } = useFirebaseData();
+  const [showRawData, setShowRawData] = useState(false);
   
   return (
     <MobileLayout 
@@ -85,18 +91,32 @@ const FirebaseDataView = () => {
         <PollingControls />
         
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Raw Data</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
-              {isLoading ? (
-                <Skeleton className="h-20 w-full" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowRawData(!showRawData)}
+            >
+              {showRawData ? (
+                <ChevronUp className="h-4 w-4" />
               ) : (
-                JSON.stringify(rawTimeseriesData, null, 2)
+                <ChevronDown className="h-4 w-4" />
               )}
-            </pre>
-          </CardContent>
+            </Button>
+          </CardHeader>
+          {showRawData && (
+            <CardContent>
+              <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
+                {isLoading ? (
+                  <Skeleton className="h-20 w-full" />
+                ) : (
+                  JSON.stringify(rawTimeseriesData, null, 2)
+                )}
+              </pre>
+            </CardContent>
+          )}
         </Card>
       </div>
     </MobileLayout>
