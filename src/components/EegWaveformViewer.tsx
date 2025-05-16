@@ -1,13 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirebaseData } from '@/providers/FirebaseDataProvider';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import SingleChannelChart from './SingleChannelChart';
 
 // Define channel colors for consistent visualization
 const CHANNEL_COLORS = [
@@ -99,8 +98,6 @@ const EegWaveformViewer = () => {
       // For each channel, calculate the moving average
       const result = { ...point };
       Object.keys(visibleChannels).forEach(channel => {
-        if (!visibleChannels[channel]) return;
-        
         let sum = 0;
         let count = 0;
         
@@ -127,21 +124,18 @@ const EegWaveformViewer = () => {
   const smoothedData = getSmoothedData();
   const hasChannelData = chartData.length > 0;
   
-  const renderCustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-2 border border-gray-200 shadow-sm rounded-md">
-          <p className="text-xs font-medium">Time: {new Date(label).toLocaleTimeString()}</p>
-          {payload.map((entry: any) => (
-            <p key={entry.name} className="text-xs" style={{ color: entry.color }}>
-              {entry.name}: {Math.round(entry.value * 100) / 100}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
+  // Process data for each channel
+  const channelData = Object.keys(visibleChannels).map((channelName, index) => {
+    return {
+      name: channelName,
+      color: CHANNEL_COLORS[index % CHANNEL_COLORS.length],
+      visible: visibleChannels[channelName],
+      data: smoothedData.map(point => ({
+        time: point.time,
+        [channelName]: point[channelName]
+      }))
+    };
+  });
   
   return (
     <Card>
@@ -156,31 +150,9 @@ const EegWaveformViewer = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex justify-between items-center">
-          <div className="grid grid-cols-4 gap-2">
-            {Object.keys(visibleChannels).slice(0, 8).map((channel, index) => (
-              <div key={channel} className="flex items-center space-x-2">
-                <Switch
-                  id={`channel-${channel}`}
-                  checked={visibleChannels[channel]}
-                  onCheckedChange={() => toggleChannel(channel)}
-                />
-                <Label 
-                  htmlFor={`channel-${channel}`} 
-                  className="flex items-center cursor-pointer"
-                >
-                  <div 
-                    className="w-3 h-3 mr-1 rounded-full" 
-                    style={{ backgroundColor: CHANNEL_COLORS[index % CHANNEL_COLORS.length] }}
-                  />
-                  {channel}
-                </Label>
-              </div>
-            ))}
-          </div>
-          
+        <div className="mb-4 flex justify-end items-center">
           <div className="flex items-center space-x-2">
-            <Label htmlFor="smoothing" className="text-sm">Smoothing:</Label>
+            <label htmlFor="smoothing" className="text-sm">Smoothing:</label>
             <Select value={smoothing} onValueChange={(value: any) => setSmoothing(value)}>
               <SelectTrigger className="w-24 h-8">
                 <SelectValue placeholder="Medium" />
@@ -210,43 +182,18 @@ const EegWaveformViewer = () => {
             </div>
           </div>
         ) : (
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={smoothedData}
-                margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis 
-                  dataKey="time" 
-                  type="number"
-                  domain={['auto', 'auto']} 
-                  tickFormatter={(value) => new Date(value).toLocaleTimeString()} 
-                  stroke="#888888" 
-                  fontSize={10}
-                />
-                <YAxis 
-                  stroke="#888888" 
-                  fontSize={10}
-                />
-                <Tooltip content={renderCustomTooltip} />
-                {Object.keys(visibleChannels).map((channel, index) => (
-                  visibleChannels[channel] && smoothedData.some(point => point[channel] !== undefined) && (
-                    <Line
-                      key={channel}
-                      type="monotone"
-                      dataKey={channel}
-                      stroke={CHANNEL_COLORS[index % CHANNEL_COLORS.length]}
-                      strokeWidth={1.5}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                      isAnimationActive={false}
-                      connectNulls={true}
-                    />
-                  )
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+          <div>
+            {channelData.map((channel) => (
+              <SingleChannelChart
+                key={channel.name}
+                channelName={channel.name}
+                color={channel.color}
+                data={channel.data}
+                visible={channel.visible}
+                onToggleVisibility={() => toggleChannel(channel.name)}
+                smoothing={smoothing}
+              />
+            ))}
           </div>
         )}
         
