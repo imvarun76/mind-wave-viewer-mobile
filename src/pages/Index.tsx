@@ -13,13 +13,6 @@ const Index = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-2">
-              <Link to="/viewer">
-                <Button variant="default" className="w-full justify-between group">
-                  View EEG Signals
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </Link>
-              
               <Link to="/firebase-data">
                 <Button variant="default" className="w-full justify-between group">
                   Firebase Health Data
