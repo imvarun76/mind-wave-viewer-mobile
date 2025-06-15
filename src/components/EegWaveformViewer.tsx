@@ -7,6 +7,8 @@ import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import SingleChannelChart from './SingleChannelChart';
+import FilterControls from './FilterControls';
+import { FilterConfig, applyFilter, getPresetFilterConfigs } from '@/utils/signalFilters';
 
 // Define channel colors for consistent visualization
 const CHANNEL_COLORS = [
@@ -35,6 +37,15 @@ const EegWaveformViewer = () => {
   
   const [smoothing, setSmoothing] = useState<'none' | 'low' | 'medium' | 'high'>('medium');
   const [chartData, setChartData] = useState<Array<any>>([]);
+  
+  // Digital filtering state
+  const [samplingRate] = useState(250); // Assume 250Hz sampling rate
+  const [filterConfig, setFilterConfig] = useState<FilterConfig>({
+    type: 'none',
+    samplingRate: samplingRate
+  });
+  
+  const presetFilters = getPresetFilterConfigs(samplingRate);
   
   // Convert Firebase timeseries data to chart-friendly format
   useEffect(() => {
@@ -121,7 +132,32 @@ const EegWaveformViewer = () => {
     });
   };
   
-  const smoothedData = getSmoothedData();
+  // Apply digital filtering to the data
+  const getFilteredData = () => {
+    const smoothedData = getSmoothedData();
+    
+    if (filterConfig.type === 'none' || smoothedData.length === 0) {
+      return smoothedData;
+    }
+    
+    // Apply digital filter to each channel
+    return smoothedData.map((point, index) => {
+      const result = { ...point };
+      
+      Object.keys(visibleChannels).forEach(channel => {
+        if (point[channel] !== undefined) {
+          // Extract channel data for filtering
+          const channelData = smoothedData.map(p => p[channel] || 0);
+          const filteredChannelData = applyFilter(channelData, filterConfig);
+          result[channel] = filteredChannelData[index];
+        }
+      });
+      
+      return result;
+    });
+  };
+  
+  const processedData = getFilteredData();
   const hasChannelData = chartData.length > 0;
   
   // Process data for each channel
@@ -130,7 +166,7 @@ const EegWaveformViewer = () => {
       name: channelName,
       color: CHANNEL_COLORS[index % CHANNEL_COLORS.length],
       visible: visibleChannels[channelName],
-      data: smoothedData.map(point => ({
+      data: processedData.map(point => ({
         time: point.time,
         [channelName]: point[channelName]
       }))
@@ -150,7 +186,7 @@ const EegWaveformViewer = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex justify-end items-center">
+        <div className="mb-4 flex justify-between items-start gap-4">
           <div className="flex items-center space-x-2">
             <label htmlFor="smoothing" className="text-sm">Smoothing:</label>
             <Select value={smoothing} onValueChange={(value: any) => setSmoothing(value)}>
@@ -165,6 +201,14 @@ const EegWaveformViewer = () => {
               </SelectContent>
             </Select>
           </div>
+          
+          <div className="flex-1 max-w-xs">
+            <FilterControls
+              filterConfig={filterConfig}
+              onFilterChange={setFilterConfig}
+              presetOptions={presetFilters}
+            />
+          </div>
         </div>
         
         {isLoading && chartData.length === 0 ? (
@@ -174,7 +218,7 @@ const EegWaveformViewer = () => {
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No waveform data available. Make sure data is being sent to the correct Firebase endpoint (eeg_data_log).
+                No waveform data available. Make sure data is being sent to the correct Firebase endpoint (eeg_signals).
               </AlertDescription>
             </Alert>
             <div className="h-[260px] w-full flex items-center justify-center text-muted-foreground">
@@ -199,7 +243,12 @@ const EegWaveformViewer = () => {
         
         <div className="mt-2 text-xs text-muted-foreground text-right">
           {chartData.length > 0 && (
-            <span>{chartData.length} data points from Firebase</span>
+            <span>
+              {chartData.length} data points from Firebase
+              {filterConfig.type !== 'none' && (
+                <> • {filterConfig.type} filter applied</>
+              )}
+            </span>
           )}
         </div>
       </CardContent>
