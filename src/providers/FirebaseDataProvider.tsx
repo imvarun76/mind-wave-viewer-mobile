@@ -42,26 +42,15 @@ type FirebaseDataContextType = {
 // Create the context
 const FirebaseDataContext = createContext<FirebaseDataContextType | undefined>(undefined);
 
-// Firebase base URL for individual channel paths
-const FIREBASE_BASE_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/esp32_001';
+// Firebase URLs matching your ESP32 code
+const FIREBASE_BASE_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app';
+const EEG_SIGNALS_URL = `${FIREBASE_BASE_URL}/devices/eeg_signals.json`;
 
-// Individual channel endpoints
-const CHANNEL_ENDPOINTS = [
-  `${FIREBASE_BASE_URL}/ch1.json`,
-  `${FIREBASE_BASE_URL}/ch2.json`,
-  `${FIREBASE_BASE_URL}/ch3.json`,
-  `${FIREBASE_BASE_URL}/ch4.json`,
-  `${FIREBASE_BASE_URL}/ch5.json`,
-  `${FIREBASE_BASE_URL}/ch6.json`,
-  `${FIREBASE_BASE_URL}/ch7.json`,
-  `${FIREBASE_BASE_URL}/ch8.json`,
-];
-
-// Health data endpoints
+// Health data endpoints (keeping these separate as they might exist)
 const HEALTH_ENDPOINTS = {
-  hr: `${FIREBASE_BASE_URL}/hr.json`,
-  spo2: `${FIREBASE_BASE_URL}/spo2.json`,
-  temp: `${FIREBASE_BASE_URL}/temp.json`,
+  hr: `${FIREBASE_BASE_URL}/devices/esp32_001/hr.json`,
+  spo2: `${FIREBASE_BASE_URL}/devices/esp32_001/spo2.json`,
+  temp: `${FIREBASE_BASE_URL}/devices/esp32_001/temp.json`,
 };
 
 export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -73,29 +62,46 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [pollingInterval, setPollingInterval] = useState<number>(500); // Default to 500ms
   const [pollingId, setPollingId] = useState<number | null>(null);
 
-  // Function to fetch data from all individual channel endpoints
+  // Function to fetch data from the ESP32's eeg_signals endpoint
   const fetchData = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // Fetch all channel data in parallel
-      const channelPromises = CHANNEL_ENDPOINTS.map(async (url, index) => {
-        try {
-          const response = await fetch(url);
-          if (!response.ok) {
-            console.warn(`Failed to fetch ch${index + 1}: ${response.status}`);
-            return { [`ch${index + 1}`]: null };
-          }
-          const value = await response.json();
-          return { [`ch${index + 1}`]: value };
-        } catch (err) {
-          console.warn(`Error fetching ch${index + 1}:`, err);
-          return { [`ch${index + 1}`]: null };
-        }
-      });
+      console.log('🔄 Fetching EEG data from:', EEG_SIGNALS_URL);
+      
+      // Fetch EEG signals data
+      const eegResponse = await fetch(EEG_SIGNALS_URL);
+      console.log('📡 EEG Response status:', eegResponse.status);
+      
+      let combinedData: FirebaseEegData = {
+        timestamp: Date.now(),
+      };
 
-      // Fetch health data in parallel
+      if (eegResponse.ok) {
+        const eegData = await eegResponse.json();
+        console.log('🧠 EEG Data received:', eegData);
+        
+        if (eegData) {
+          // Extract channel data from the ESP32 format
+          combinedData = {
+            ...combinedData,
+            ch1: eegData.ch1,
+            ch2: eegData.ch2,
+            ch3: eegData.ch3,
+            ch4: eegData.ch4,
+            ch5: eegData.ch5,
+            ch6: eegData.ch6,
+            ch7: eegData.ch7,
+            ch8: eegData.ch8,
+            timestamp: eegData.timestamp || Date.now(),
+          };
+        }
+      } else {
+        console.warn('⚠️ Failed to fetch EEG data:', eegResponse.status);
+      }
+
+      // Fetch health data in parallel (optional)
       const healthPromises = Object.entries(HEALTH_ENDPOINTS).map(async ([key, url]) => {
         try {
           const response = await fetch(url);
@@ -111,26 +117,15 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
       });
 
-      // Wait for all requests to complete
-      const [channelResults, healthResults] = await Promise.all([
-        Promise.all(channelPromises),
-        Promise.all(healthPromises)
-      ]);
-
-      // Combine all results into a single data object
-      const combinedData: FirebaseEegData = {
-        timestamp: Date.now(),
-      };
-
-      // Add channel data
-      channelResults.forEach(result => {
-        Object.assign(combinedData, result);
-      });
-
+      // Wait for health data
+      const healthResults = await Promise.all(healthPromises);
+      
       // Add health data
       healthResults.forEach(result => {
         Object.assign(combinedData, result);
       });
+
+      console.log('📊 Combined data:', combinedData);
 
       // Update current data
       setData(combinedData);
@@ -157,6 +152,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return combinedData;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      console.error('❌ Error fetching data:', errorMessage);
       setError(errorMessage);
       
       toast({
