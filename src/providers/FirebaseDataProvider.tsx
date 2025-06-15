@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { toast } from '@/components/ui/use-toast';
 
@@ -43,11 +42,27 @@ type FirebaseDataContextType = {
 // Create the context
 const FirebaseDataContext = createContext<FirebaseDataContextType | undefined>(undefined);
 
-// Firebase API endpoint - updated to use ordered query
-const FIREBASE_API_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/eeg_data_log.json?orderBy="$key"&limitToLast=50';
+// Firebase base URL for individual channel paths
+const FIREBASE_BASE_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/esp32_001';
 
-// Fallback to single data point if log endpoint doesn't work
-const FIREBASE_FALLBACK_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app/devices/eeg_data.json';
+// Individual channel endpoints
+const CHANNEL_ENDPOINTS = [
+  `${FIREBASE_BASE_URL}/ch1.json`,
+  `${FIREBASE_BASE_URL}/ch2.json`,
+  `${FIREBASE_BASE_URL}/ch3.json`,
+  `${FIREBASE_BASE_URL}/ch4.json`,
+  `${FIREBASE_BASE_URL}/ch5.json`,
+  `${FIREBASE_BASE_URL}/ch6.json`,
+  `${FIREBASE_BASE_URL}/ch7.json`,
+  `${FIREBASE_BASE_URL}/ch8.json`,
+];
+
+// Health data endpoints
+const HEALTH_ENDPOINTS = {
+  hr: `${FIREBASE_BASE_URL}/hr.json`,
+  spo2: `${FIREBASE_BASE_URL}/spo2.json`,
+  temp: `${FIREBASE_BASE_URL}/temp.json`,
+};
 
 export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<FirebaseEegData>({});
@@ -55,60 +70,94 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [pollingInterval, setPollingInterval] = useState<number>(1000); // Default to 1 second
+  const [pollingInterval, setPollingInterval] = useState<number>(500); // Default to 500ms
   const [pollingId, setPollingId] = useState<number | null>(null);
-  const [useLogEndpoint, setUseLogEndpoint] = useState<boolean>(true);
 
-  // Function to fetch data from Firebase
+  // Function to fetch data from all individual channel endpoints
   const fetchData = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // First try the log endpoint
-      const url = useLogEndpoint ? FIREBASE_API_URL : FIREBASE_FALLBACK_URL;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (useLogEndpoint && result) {
-        // We're using the log endpoint and got data
-        setRawTimeseriesData(result || {});
-        
-        // Extract the latest data point for backward compatibility
-        const timestamps = Object.keys(result || {}).sort();
-        if (timestamps.length > 0) {
-          const latestTimestamp = timestamps[timestamps.length - 1];
-          setData(result[latestTimestamp] || {});
+      // Fetch all channel data in parallel
+      const channelPromises = CHANNEL_ENDPOINTS.map(async (url, index) => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.warn(`Failed to fetch ch${index + 1}: ${response.status}`);
+            return { [`ch${index + 1}`]: null };
+          }
+          const value = await response.json();
+          return { [`ch${index + 1}`]: value };
+        } catch (err) {
+          console.warn(`Error fetching ch${index + 1}:`, err);
+          return { [`ch${index + 1}`]: null };
         }
-      } else if (!useLogEndpoint && result) {
-        // Using the fallback endpoint
-        setData(result || {});
-        // Update timeseries with a single point
-        const timestamp = Date.now().toString();
-        setRawTimeseriesData({ [timestamp]: result || {} });
-      } else if (useLogEndpoint && !result) {
-        // Log endpoint returned no data, try fallback next time
-        console.log("Log endpoint returned no data, switching to fallback endpoint");
-        setUseLogEndpoint(false);
-      }
+      });
+
+      // Fetch health data in parallel
+      const healthPromises = Object.entries(HEALTH_ENDPOINTS).map(async ([key, url]) => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.warn(`Failed to fetch ${key}: ${response.status}`);
+            return { [key]: null };
+          }
+          const value = await response.json();
+          return { [key]: value };
+        } catch (err) {
+          console.warn(`Error fetching ${key}:`, err);
+          return { [key]: null };
+        }
+      });
+
+      // Wait for all requests to complete
+      const [channelResults, healthResults] = await Promise.all([
+        Promise.all(channelPromises),
+        Promise.all(healthPromises)
+      ]);
+
+      // Combine all results into a single data object
+      const combinedData: FirebaseEegData = {
+        timestamp: Date.now(),
+      };
+
+      // Add channel data
+      channelResults.forEach(result => {
+        Object.assign(combinedData, result);
+      });
+
+      // Add health data
+      healthResults.forEach(result => {
+        Object.assign(combinedData, result);
+      });
+
+      // Update current data
+      setData(combinedData);
+
+      // Update timeseries data with the new data point
+      const timestamp = Date.now().toString();
+      setRawTimeseriesData(prev => {
+        const newTimeseries = { ...prev, [timestamp]: combinedData };
+        
+        // Keep only the last 100 data points to prevent memory issues
+        const timestamps = Object.keys(newTimeseries).sort();
+        if (timestamps.length > 100) {
+          const trimmedTimeseries: FirebaseTimestampedData = {};
+          timestamps.slice(-100).forEach(ts => {
+            trimmedTimeseries[ts] = newTimeseries[ts];
+          });
+          return trimmedTimeseries;
+        }
+        
+        return newTimeseries;
+      });
       
       setLastUpdated(new Date());
-      
-      return result;
+      return combinedData;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       setError(errorMessage);
-      
-      // If we got an error with the log endpoint, try the fallback next time
-      if (useLogEndpoint) {
-        console.log("Error with log endpoint, switching to fallback endpoint");
-        setUseLogEndpoint(false);
-      }
       
       toast({
         title: "Data Fetch Error",
@@ -154,7 +203,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
         window.clearInterval(pollingId);
       }
     };
-  }, [pollingInterval, useLogEndpoint]);
+  }, [pollingInterval]);
 
   // Handler for changing the polling interval
   const handleSetPollingInterval = (interval: number) => {
