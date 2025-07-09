@@ -1,6 +1,5 @@
-
 // Digital signal processing filters for EEG data
-export type FilterType = 'none' | 'lowpass' | 'highpass' | 'bandpass' | 'notch';
+export type FilterType = 'none' | 'lowpass' | 'highpass' | 'bandpass' | 'notch' | 'advanced';
 
 export interface FilterConfig {
   type: FilterType;
@@ -9,6 +8,9 @@ export interface FilterConfig {
   notchFreq?: number;   // Hz (for notch filter)
   order?: number;       // Filter order
   samplingRate: number; // Hz
+  enableDCBlock?: boolean;
+  enableArtifactRemoval?: boolean;
+  enablePowerLineRemoval?: boolean;
 }
 
 // Simple Butterworth-like IIR filter implementation
@@ -152,17 +154,120 @@ export class NotchFilter {
   }
 }
 
-// Main filtering function
+// Import advanced filters
+import { DCBlocker, ArtifactDetector, PowerLineNotchFilter, assessSignalQuality } from './advancedFilters';
+
+// Enhanced filtering chain
+export class EnhancedFilterChain {
+  private dcBlocker?: DCBlocker;
+  private artifactDetector?: ArtifactDetector;
+  private powerLineFilter?: PowerLineNotchFilter;
+  private mainFilter?: MovingAverageFilter | HighPassFilter | NotchFilter;
+  private config: FilterConfig;
+
+  constructor(config: FilterConfig) {
+    this.config = config;
+    this.initializeFilters();
+  }
+
+  private initializeFilters() {
+    if (this.config.enableDCBlock) {
+      this.dcBlocker = new DCBlocker(0.1, this.config.samplingRate);
+    }
+
+    if (this.config.enableArtifactRemoval) {
+      this.artifactDetector = new ArtifactDetector(200, 10);
+    }
+
+    if (this.config.enablePowerLineRemoval) {
+      // Remove both 50Hz and 60Hz power line interference
+      this.powerLineFilter = new PowerLineNotchFilter([50, 60], this.config.samplingRate);
+    }
+
+    // Initialize main filter based on type
+    switch (this.config.type) {
+      case 'lowpass':
+        const windowSize = Math.max(1, Math.floor(this.config.samplingRate / (this.config.highCutoff || 30) / 2));
+        this.mainFilter = new MovingAverageFilter(windowSize);
+        break;
+      case 'highpass':
+        this.mainFilter = new HighPassFilter(this.config.lowCutoff || 0.5, this.config.samplingRate);
+        break;
+      case 'notch':
+        this.mainFilter = new NotchFilter(this.config.notchFreq || 50, this.config.samplingRate);
+        break;
+    }
+  }
+
+  process(input: number): number {
+    let output = input;
+
+    // Step 1: Remove DC offset
+    if (this.dcBlocker) {
+      output = this.dcBlocker.process(output);
+    }
+
+    // Step 2: Remove power line interference
+    if (this.powerLineFilter) {
+      output = this.powerLineFilter.process(output);
+    }
+
+    // Step 3: Apply main filter
+    if (this.mainFilter) {
+      output = this.mainFilter.process(output);
+    }
+
+    // Step 4: Artifact detection and removal
+    if (this.artifactDetector && this.artifactDetector.detectArtifact(output)) {
+      // Replace artifact with interpolated value (simple approach)
+      output = 0; // or use last good value
+    }
+
+    return output;
+  }
+
+  reset() {
+    if (this.dcBlocker) this.dcBlocker.reset();
+    if (this.mainFilter && 'reset' in this.mainFilter) {
+      this.mainFilter.reset();
+    }
+  }
+}
+
+// Enhanced main filtering function
 export const applyFilter = (data: number[], config: FilterConfig): number[] => {
   if (config.type === 'none' || data.length === 0) {
     return [...data];
+  }
+
+  if (config.type === 'advanced') {
+    // Use enhanced filtering chain
+    const filterChain = new EnhancedFilterChain({
+      ...config,
+      enableDCBlock: true,
+      enableArtifactRemoval: true,
+      enablePowerLineRemoval: true
+    });
+
+    return data.map(value => filterChain.process(value));
+  }
+
+  if (config.type === 'bandpass') {
+    // Apply high-pass then low-pass
+    const hpFilter = new HighPassFilter(config.lowCutoff || 0.5, config.samplingRate);
+    const lpWindowSize = Math.max(1, Math.floor(config.samplingRate / (config.highCutoff || 30) / 2));
+    const lpFilter = new MovingAverageFilter(lpWindowSize);
+    
+    return data.map(value => {
+      const hpOutput = hpFilter.process(value);
+      return lpFilter.process(hpOutput);
+    });
   }
 
   let filter: MovingAverageFilter | HighPassFilter | NotchFilter;
   
   switch (config.type) {
     case 'lowpass':
-      // Use moving average for simple low-pass filtering
       const windowSize = Math.max(1, Math.floor(config.samplingRate / (config.highCutoff || 30) / 2));
       filter = new MovingAverageFilter(windowSize);
       break;
@@ -170,17 +275,6 @@ export const applyFilter = (data: number[], config: FilterConfig): number[] => {
     case 'highpass':
       filter = new HighPassFilter(config.lowCutoff || 0.5, config.samplingRate);
       break;
-      
-    case 'bandpass':
-      // Apply high-pass then low-pass
-      const hpFilter = new HighPassFilter(config.lowCutoff || 0.5, config.samplingRate);
-      const lpWindowSize = Math.max(1, Math.floor(config.samplingRate / (config.highCutoff || 30) / 2));
-      const lpFilter = new MovingAverageFilter(lpWindowSize);
-      
-      return data.map(value => {
-        const hpOutput = hpFilter.process(value);
-        return lpFilter.process(hpOutput);
-      });
       
     case 'notch':
       filter = new NotchFilter(config.notchFreq || 50, config.samplingRate);
@@ -193,7 +287,7 @@ export const applyFilter = (data: number[], config: FilterConfig): number[] => {
   return data.map(value => filter.process(value));
 };
 
-// Preset filter configurations for common EEG applications
+// Enhanced preset filter configurations
 export const getPresetFilterConfigs = (samplingRate: number): Record<string, FilterConfig> => ({
   none: {
     type: 'none',
@@ -224,5 +318,17 @@ export const getPresetFilterConfigs = (samplingRate: number): Record<string, Fil
     type: 'notch',
     notchFreq: 60,
     samplingRate
+  },
+  'advanced-clean': {
+    type: 'advanced',
+    lowCutoff: 0.5,
+    highCutoff: 40,
+    samplingRate,
+    enableDCBlock: true,
+    enableArtifactRemoval: true,
+    enablePowerLineRemoval: true
   }
 });
+
+// Export signal quality assessment
+export { assessSignalQuality } from './advancedFilters';

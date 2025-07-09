@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -57,6 +56,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
               <SelectItem value="eeg-band">EEG Band (0.5-40Hz)</SelectItem>
               <SelectItem value="notch-50hz">50Hz Notch</SelectItem>
               <SelectItem value="notch-60hz">60Hz Notch</SelectItem>
+              <SelectItem value="advanced-clean">Advanced Clean</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -77,9 +77,37 @@ const FilterControls: React.FC<FilterControlsProps> = ({
               <SelectItem value="highpass">High Pass</SelectItem>
               <SelectItem value="bandpass">Band Pass</SelectItem>
               <SelectItem value="notch">Notch</SelectItem>
+              <SelectItem value="advanced">Advanced</SelectItem>
             </SelectContent>
           </Select>
         </div>
+
+        {/* Advanced Filter Options */}
+        {filterConfig.type === 'advanced' && (
+          <div className="space-y-3 border-t pt-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">DC Blocking</Label>
+              <Switch
+                checked={filterConfig.enableDCBlock || false}
+                onCheckedChange={(checked) => handleCustomFilterChange({ enableDCBlock: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Artifact Removal</Label>
+              <Switch
+                checked={filterConfig.enableArtifactRemoval || false}
+                onCheckedChange={(checked) => handleCustomFilterChange({ enableArtifactRemoval: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Power Line Removal</Label>
+              <Switch
+                checked={filterConfig.enablePowerLineRemoval || false}
+                onCheckedChange={(checked) => handleCustomFilterChange({ enablePowerLineRemoval: checked })}
+              />
+            </div>
+          </div>
+        )}
 
         {/* High-pass cutoff */}
         {(filterConfig.type === 'highpass' || filterConfig.type === 'bandpass') && (
