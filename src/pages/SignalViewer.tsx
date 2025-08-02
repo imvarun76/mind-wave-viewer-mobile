@@ -3,11 +3,13 @@ import { useState } from 'react';
 import MobileLayout from '@/components/MobileLayout';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import EegSignalChart from '@/components/EegSignalChart';
+import ProfessionalEegChart from '@/components/ProfessionalEegChart';
 import RecordingControls from '@/components/RecordingControls';
 import { useEegData } from '@/providers/EegDataProvider';
 import { Button } from '@/components/ui/button';
-import { Sliders } from 'lucide-react';
+import { Sliders, Monitor } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ChannelControls from '@/components/ChannelControls';
 
 const SignalViewer = () => {
@@ -53,7 +55,27 @@ const SignalViewer = () => {
                 {visibleChannels.length} channel{visibleChannels.length !== 1 && 's'}
               </div>
             </div>
-            <EegSignalChart height={getChartHeight()} />
+            
+            <Tabs defaultValue="professional" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="professional" className="flex items-center gap-2">
+                  <Monitor className="h-4 w-4" />
+                  Professional
+                </TabsTrigger>
+                <TabsTrigger value="standard" className="flex items-center gap-2">
+                  <Sliders className="h-4 w-4" />
+                  Standard
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="professional" className="mt-0">
+                <ProfessionalEegChart />
+              </TabsContent>
+              
+              <TabsContent value="standard" className="mt-0">
+                <EegSignalChart height={getChartHeight()} />
+              </TabsContent>
+            </Tabs>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">

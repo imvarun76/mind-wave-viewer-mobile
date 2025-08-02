@@ -293,6 +293,54 @@ export const getPresetFilterConfigs = (samplingRate: number): Record<string, Fil
     type: 'none',
     samplingRate
   },
+  'clinical-eeg': {
+    type: 'advanced',
+    lowCutoff: 0.1,
+    highCutoff: 70,
+    samplingRate,
+    enableDCBlock: true,
+    enableArtifactRemoval: true,
+    enablePowerLineRemoval: true
+  },
+  'spike-recorder': {
+    type: 'advanced',
+    lowCutoff: 0.5,
+    highCutoff: 40,
+    samplingRate,
+    enableDCBlock: true,
+    enableArtifactRemoval: true,
+    enablePowerLineRemoval: true
+  },
+  'emg-clean': {
+    type: 'bandpass',
+    lowCutoff: 20,
+    highCutoff: 450,
+    samplingRate
+  },
+  'ecg-monitor': {
+    type: 'bandpass',
+    lowCutoff: 0.5,
+    highCutoff: 40,
+    samplingRate
+  },
+  'alpha-waves': {
+    type: 'bandpass',
+    lowCutoff: 8,
+    highCutoff: 13,
+    samplingRate
+  },
+  'beta-waves': {
+    type: 'bandpass',
+    lowCutoff: 13,
+    highCutoff: 30,
+    samplingRate
+  },
+  'gamma-waves': {
+    type: 'bandpass',
+    lowCutoff: 30,
+    highCutoff: 100,
+    samplingRate
+  },
   'low-noise': {
     type: 'lowpass',
     highCutoff: 40,
