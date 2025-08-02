@@ -23,10 +23,10 @@ const ProfessionalEegChart: React.FC = () => {
   const [showGrid, setShowGrid] = useState(true);
   const [autoScale, setAutoScale] = useState(true);
   
-  // Channel configuration
+  // Channel configuration - all enabled but smart detection for active channels
   const [visibleChannels, setVisibleChannels] = useState({
-    ch1: true, ch2: true, ch3: false, ch4: false,
-    ch5: false, ch6: false, ch7: false, ch8: false
+    ch1: true, ch2: true, ch3: true, ch4: true,
+    ch5: true, ch6: true, ch7: true, ch8: true
   });
   
   // Filter configuration for professional signal cleaning
@@ -66,7 +66,7 @@ const ProfessionalEegChart: React.FC = () => {
     setFilterChains(chains);
   }, [filterConfig]);
   
-  // Process incoming data with professional filtering
+  // Process incoming data with professional filtering and smart channel detection
   useEffect(() => {
     if (!rawTimeseriesData || Object.keys(rawTimeseriesData).length === 0) return;
     
@@ -81,8 +81,23 @@ const ProfessionalEegChart: React.FC = () => {
     
     Object.keys(visibleChannels).forEach(channel => {
       if (latest[channel] !== undefined && filterChains[channel]) {
-        // Apply professional-grade filtering
-        const filteredValue = filterChains[channel].process(latest[channel]);
+        // Detect signal type for smart optimization
+        const rawValue = latest[channel];
+        let signalType = 'normal';
+        
+        if (rawValue === 4095) signalType = 'floating'; // Unconnected pin
+        else if (rawValue === 0) signalType = 'grounded'; // Grounded or no signal
+        else if (rawValue > 10 && rawValue < 4080) signalType = 'active'; // Real signal
+        
+        // Apply different processing based on signal type
+        let filteredValue = rawValue;
+        if (signalType === 'active') {
+          // Apply full professional filtering for active signals
+          filteredValue = filterChains[channel].process(rawValue);
+        } else if (signalType === 'floating') {
+          // Suppress floating noise
+          filteredValue = 0;
+        }
         
         // Maintain rolling buffer
         if (!newProcessedData[channel]) newProcessedData[channel] = [];
@@ -94,9 +109,12 @@ const ProfessionalEegChart: React.FC = () => {
           newProcessedData[channel] = newProcessedData[channel].slice(-maxPoints);
         }
         
-        // Assess signal quality
+        // Assess signal quality with signal type info
         if (newProcessedData[channel].length > 100) {
-          newQuality[channel] = assessSignalQuality(newProcessedData[channel].slice(-100));
+          const quality = assessSignalQuality(newProcessedData[channel].slice(-100));
+          newQuality[channel] = { ...quality, signalType };
+        } else {
+          newQuality[channel] = { signalType };
         }
       }
     });
@@ -221,12 +239,18 @@ const ProfessionalEegChart: React.FC = () => {
       ctx.stroke();
       ctx.globalAlpha = 1.0;
       
-      // Draw channel label with quality indicator
+      // Draw channel label with quality and signal type indicator
       ctx.fillStyle = color;
       ctx.font = '12px monospace';
       ctx.textAlign = 'left';
+      
+      const signalType = quality?.signalType || 'unknown';
+      const statusIcon = signalType === 'active' ? '●' : 
+                        signalType === 'floating' ? '⚠' : 
+                        signalType === 'grounded' ? '○' : '?';
+      
       ctx.fillText(
-        `${channel.toUpperCase()}${quality ? ` (${quality.quality})` : ''}`, 
+        `${statusIcon} ${channel.toUpperCase()}${quality?.quality ? ` (${quality.quality})` : ''}`, 
         5, 
         channelY - channelHeight * 0.4 + 15
       );
@@ -403,18 +427,37 @@ const ProfessionalEegChart: React.FC = () => {
             const quality = signalQuality[channel];
             if (!quality) return null;
             
+            const signalType = quality.signalType || 'unknown';
+            const statusColor = signalType === 'active' ? 'text-green-500' :
+                              signalType === 'floating' ? 'text-orange-500' :
+                              signalType === 'grounded' ? 'text-gray-500' : 'text-red-500';
+            
             return (
               <div key={channel} className="text-xs p-2 bg-muted rounded">
-                <div className="font-mono">{channel.toUpperCase()}</div>
-                <div className={`font-semibold ${
-                  quality.quality === 'excellent' ? 'text-green-500' :
-                  quality.quality === 'good' ? 'text-blue-500' :
-                  quality.quality === 'fair' ? 'text-yellow-500' : 'text-red-500'
-                }`}>
-                  {quality.quality.toUpperCase()}
+                <div className="font-mono flex items-center gap-1">
+                  <span className={statusColor}>
+                    {signalType === 'active' ? '●' : 
+                     signalType === 'floating' ? '⚠' : 
+                     signalType === 'grounded' ? '○' : '?'}
+                  </span>
+                  {channel.toUpperCase()}
                 </div>
-                <div className="text-muted-foreground">
-                  SNR: {quality.snr.toFixed(1)}
+                {quality.quality && (
+                  <div className={`font-semibold ${
+                    quality.quality === 'excellent' ? 'text-green-500' :
+                    quality.quality === 'good' ? 'text-blue-500' :
+                    quality.quality === 'fair' ? 'text-yellow-500' : 'text-red-500'
+                  }`}>
+                    {quality.quality.toUpperCase()}
+                  </div>
+                )}
+                {quality.snr && (
+                  <div className="text-muted-foreground">
+                    SNR: {quality.snr.toFixed(1)}
+                  </div>
+                )}
+                <div className="text-muted-foreground capitalize">
+                  {signalType}
                 </div>
               </div>
             );
