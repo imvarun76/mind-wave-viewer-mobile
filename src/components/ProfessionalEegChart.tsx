@@ -25,7 +25,7 @@ const ProfessionalEegChart: React.FC = () => {
   
   // Channel configuration
   const [visibleChannels, setVisibleChannels] = useState({
-    ch1: true, ch2: true, ch3: true, ch4: true,
+    ch1: true, ch2: true, ch3: false, ch4: false,
     ch5: false, ch6: false, ch7: false, ch8: false
   });
   
