@@ -95,8 +95,17 @@ const ProfessionalEegChart: React.FC = () => {
           // Apply full professional filtering for active signals
           filteredValue = filterChains[channel].process(rawValue);
         } else if (signalType === 'floating') {
-          // Suppress floating noise
+          // Suppress floating noise completely
           filteredValue = 0;
+          console.log(`🔇 Suppressing floating channel ${channel}: ${rawValue} -> ${filteredValue}`);
+        } else if (signalType === 'grounded') {
+          // Keep grounded signals as-is
+          filteredValue = rawValue;
+        }
+        
+        // Debug logging for channel 3
+        if (channel === 'ch3') {
+          console.log(`📊 CH3 Debug - Raw: ${rawValue}, Type: ${signalType}, Filtered: ${filteredValue}`);
         }
         
         // Maintain rolling buffer
