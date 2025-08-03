@@ -81,31 +81,21 @@ const ProfessionalEegChart: React.FC = () => {
     
     Object.keys(visibleChannels).forEach(channel => {
       if (latest[channel] !== undefined && filterChains[channel]) {
-        // Detect signal type for smart optimization
         const rawValue = latest[channel];
-        let signalType = 'normal';
         
-        if (rawValue === 4095) signalType = 'floating'; // Unconnected pin
-        else if (rawValue === 0) signalType = 'grounded'; // Grounded or no signal
-        else if (rawValue > 10 && rawValue < 4080) signalType = 'active'; // Real signal
+        // Determine signal type
+        let signalType: string;
+        if (rawValue === 4095) signalType = 'floating';
+        else if (rawValue === 0) signalType = 'grounded';
+        else if (rawValue > 10 && rawValue < 4080) signalType = 'active';
+        else signalType = 'unknown';
         
-        // Apply different processing based on signal type
-        let filteredValue = rawValue;
+        // Simple fix: if value is 4095 (floating pin), set to 0
+        let filteredValue = rawValue === 4095 ? 0 : rawValue;
+        
+        // Apply filtering to active signals only
         if (signalType === 'active') {
-          // Apply full professional filtering for active signals
           filteredValue = filterChains[channel].process(rawValue);
-        } else if (signalType === 'floating') {
-          // Suppress floating noise completely
-          filteredValue = 0;
-          console.log(`🔇 Suppressing floating channel ${channel}: ${rawValue} -> ${filteredValue}`);
-        } else if (signalType === 'grounded') {
-          // Keep grounded signals as-is
-          filteredValue = rawValue;
-        }
-        
-        // Debug logging for channel 3
-        if (channel === 'ch3') {
-          console.log(`📊 CH3 Debug - Raw: ${rawValue}, Type: ${signalType}, Filtered: ${filteredValue}`);
         }
         
         // Maintain rolling buffer
