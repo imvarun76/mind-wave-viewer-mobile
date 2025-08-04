@@ -1,18 +1,26 @@
 /*
  * 8-Channel EEG Data Acquisition System for ESP32
+ * Current Setup: EXG Pill with 3 electrodes (FP1, FP2, T4)
  * 
- * This code reads from 8 analog channels and sends the data to Firebase
- * Optimized for electrode positions: FP1, FP2, T4, and additional channels
+ * Hardware Configuration:
+ * - EXG Pill OUT -> ESP32 Pin 35 (CH4) - Amplified differential signal
+ * - EXG Pill GND -> ESP32 GND
+ * - EXG Pill 5V  -> ESP32 5V
+ * 
+ * Electrode Placement:
+ * - FP1: Left Forehead (connected to EXG pill)
+ * - FP2: Right Forehead (connected to EXG pill) 
+ * - T4:  Right Temporal (reference, connected to EXG pill)
  * 
  * Pin Configuration:
- * - CH1 (FP1): GPIO 36 (A0) - Left Forehead
- * - CH2 (FP2): GPIO 39 (A3) - Right Forehead  
- * - CH3 (T4):  GPIO 34 (A6) - Right Temporal
- * - CH4:       GPIO 35 (A7) - Available
- * - CH5:       GPIO 32 (A4) - Available
- * - CH6:       GPIO 33 (A5) - Available
- * - CH7:       GPIO 25 (A18)- Available
- * - CH8:       GPIO 26 (A19)- Available
+ * - CH1: GPIO 36 (A0) - Available for future expansion
+ * - CH2: GPIO 39 (A3) - Available for future expansion
+ * - CH3: GPIO 34 (A6) - Available for future expansion
+ * - CH4: GPIO 35 (A7) - **EXG PILL OUTPUT** (Active Channel)
+ * - CH5: GPIO 32 (A4) - Available for future expansion
+ * - CH6: GPIO 33 (A5) - Available for future expansion
+ * - CH7: GPIO 25 (A18)- Available for future expansion
+ * - CH8: GPIO 26 (A19)- Available for future expansion
  */
 
 #include <WiFi.h>
@@ -29,18 +37,21 @@ const char* firebaseAuth = "YOUR_FIREBASE_AUTH_TOKEN"; // Optional
 
 // ADC pin definitions for 8 channels
 const int adcPins[8] = {
-  36, // CH1 - FP1 (Left Forehead)
-  39, // CH2 - FP2 (Right Forehead)
-  34, // CH3 - T4 (Right Temporal)
-  35, // CH4 - Available
-  32, // CH5 - Available
-  33, // CH6 - Available
-  25, // CH7 - Available
-  26  // CH8 - Available
+  36, // CH1 - Available for expansion
+  39, // CH2 - Available for expansion
+  34, // CH3 - Available for expansion
+  35, // CH4 - **EXG PILL OUTPUT** (FP1, FP2, T4 differential)
+  32, // CH5 - Available for expansion
+  33, // CH6 - Available for expansion
+  25, // CH7 - Available for expansion
+  26  // CH8 - Available for expansion
 };
 
 // Channel names for easy identification
 const char* channelNames[8] = {"ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7", "ch8"};
+
+// EXG Pill configuration
+const int EXG_CHANNEL = 3; // CH4 (index 3) is connected to EXG pill output
 
 // Sampling configuration
 const int samplingRate = 250; // Hz
@@ -76,16 +87,26 @@ void setup() {
     pinMode(adcPins[i], INPUT);
   }
   
-  Serial.println("🧠 8-Channel EEG System Initializing...");
-  Serial.println("📍 Channel Configuration:");
-  Serial.println("   CH1 (Pin 36) - FP1 Left Forehead");
-  Serial.println("   CH2 (Pin 39) - FP2 Right Forehead");
-  Serial.println("   CH3 (Pin 34) - T4 Right Temporal");
-  Serial.println("   CH4 (Pin 35) - Available");
-  Serial.println("   CH5 (Pin 32) - Available");
-  Serial.println("   CH6 (Pin 33) - Available");
-  Serial.println("   CH7 (Pin 25) - Available");
-  Serial.println("   CH8 (Pin 26) - Available");
+  Serial.println("🧠 8-Channel EEG System with EXG Pill");
+  Serial.println("📍 Hardware Configuration:");
+  Serial.println("   EXG Pill OUT -> ESP32 Pin 35 (CH4)");
+  Serial.println("   EXG Pill GND -> ESP32 GND");
+  Serial.println("   EXG Pill 5V  -> ESP32 5V");
+  Serial.println();
+  Serial.println("🧠 Electrode Setup:");
+  Serial.println("   FP1: Left Forehead  -> EXG Pill");
+  Serial.println("   FP2: Right Forehead -> EXG Pill");
+  Serial.println("   T4:  Right Temporal -> EXG Pill (Reference)");
+  Serial.println();
+  Serial.println("📊 Channel Configuration:");
+  Serial.println("   CH1 (Pin 36) - Available for expansion");
+  Serial.println("   CH2 (Pin 39) - Available for expansion");
+  Serial.println("   CH3 (Pin 34) - Available for expansion");
+  Serial.println("   CH4 (Pin 35) - **EXG PILL ACTIVE**");
+  Serial.println("   CH5 (Pin 32) - Available for expansion");
+  Serial.println("   CH6 (Pin 33) - Available for expansion");
+  Serial.println("   CH7 (Pin 25) - Available for expansion");
+  Serial.println("   CH8 (Pin 26) - Available for expansion");
   
   // Connect to WiFi
   connectToWiFi();

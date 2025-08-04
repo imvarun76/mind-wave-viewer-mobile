@@ -257,8 +257,13 @@ const ProfessionalEegChart: React.FC = () => {
                         signalType === 'floating' ? '⚠' : 
                         signalType === 'grounded' ? '○' : '?';
       
+      // Highlight CH4 as EXG channel
+      const channelLabel = channel === 'ch4' ? 
+        `${statusIcon} ${channel.toUpperCase()} [EXG]${quality?.quality ? ` (${quality.quality})` : ''}` :
+        `${statusIcon} ${channel.toUpperCase()}${quality?.quality ? ` (${quality.quality})` : ''}`;
+      
       ctx.fillText(
-        `${statusIcon} ${channel.toUpperCase()}${quality?.quality ? ` (${quality.quality})` : ''}`, 
+        channelLabel, 
         5, 
         channelY - channelHeight * 0.4 + 15
       );
