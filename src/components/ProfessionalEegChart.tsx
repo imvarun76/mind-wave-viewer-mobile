@@ -83,7 +83,7 @@ const ProfessionalEegChart: React.FC = () => {
       if (latest[channel] !== undefined && filterChains[channel]) {
         const rawValue = latest[channel];
         
-        // Improved signal type detection for floating pins
+        // Enhanced floating pin detection - more restrictive for active signals
         let signalType: string;
         let filteredValue = rawValue;
         
@@ -93,12 +93,19 @@ const ProfessionalEegChart: React.FC = () => {
         } else if (rawValue === 0) {
           signalType = 'grounded';
           filteredValue = 0;
-        } else if (rawValue > 100 && rawValue < 4000) {
-          signalType = 'active'; // Only consider significant signals as active
-        } else {
-          // Values between 1-100 or 4000-4094 are likely floating pin noise
+        } else if (channel === 'ch4' && rawValue > 200 && rawValue < 3800) {
+          // Channel 4 is the EXG channel - be more permissive
+          signalType = 'active';
+        } else if (channel !== 'ch4' && (rawValue < 50 || rawValue > 4000 || (rawValue > 200 && rawValue < 1000))) {
+          // For non-EXG channels, be more restrictive - values in 200-1000 range are often floating
           signalType = 'floating';
-          filteredValue = 0; // Suppress noise from floating pins
+          filteredValue = 0;
+          console.log(`🔇 Suppressing floating noise on ${channel}: ${rawValue} -> 0`);
+        } else if (rawValue > 50 && rawValue < 4000) {
+          signalType = 'active';
+        } else {
+          signalType = 'floating';
+          filteredValue = 0;
           console.log(`🔇 Suppressing floating noise on ${channel}: ${rawValue} -> 0`);
         }
         
