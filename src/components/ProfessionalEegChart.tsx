@@ -83,31 +83,15 @@ const ProfessionalEegChart: React.FC = () => {
       if (latest[channel] !== undefined && filterChains[channel]) {
         const rawValue = latest[channel];
         
-        // Enhanced floating pin detection - more restrictive for active signals
+        // Determine signal type
         let signalType: string;
-        let filteredValue = rawValue;
+        if (rawValue === 4095) signalType = 'floating';
+        else if (rawValue === 0) signalType = 'grounded';
+        else if (rawValue > 10 && rawValue < 4080) signalType = 'active';
+        else signalType = 'unknown';
         
-        if (rawValue === 4095) {
-          signalType = 'floating';
-          filteredValue = 0; // Suppress floating pins
-        } else if (rawValue === 0) {
-          signalType = 'grounded';
-          filteredValue = 0;
-        } else if (channel === 'ch4' && rawValue > 200 && rawValue < 3800) {
-          // Channel 4 is the EXG channel - be more permissive
-          signalType = 'active';
-        } else if (channel !== 'ch4' && (rawValue < 50 || rawValue > 4000 || (rawValue > 200 && rawValue < 1000))) {
-          // For non-EXG channels, be more restrictive - values in 200-1000 range are often floating
-          signalType = 'floating';
-          filteredValue = 0;
-          console.log(`🔇 Suppressing floating noise on ${channel}: ${rawValue} -> 0`);
-        } else if (rawValue > 50 && rawValue < 4000) {
-          signalType = 'active';
-        } else {
-          signalType = 'floating';
-          filteredValue = 0;
-          console.log(`🔇 Suppressing floating noise on ${channel}: ${rawValue} -> 0`);
-        }
+        // Simple fix: if value is 4095 (floating pin), set to 0
+        let filteredValue = rawValue === 4095 ? 0 : rawValue;
         
         // Apply filtering to active signals only
         if (signalType === 'active') {
@@ -264,13 +248,8 @@ const ProfessionalEegChart: React.FC = () => {
                         signalType === 'floating' ? '⚠' : 
                         signalType === 'grounded' ? '○' : '?';
       
-      // Highlight CH4 as EXG channel
-      const channelLabel = channel === 'ch4' ? 
-        `${statusIcon} ${channel.toUpperCase()} [EXG]${quality?.quality ? ` (${quality.quality})` : ''}` :
-        `${statusIcon} ${channel.toUpperCase()}${quality?.quality ? ` (${quality.quality})` : ''}`;
-      
       ctx.fillText(
-        channelLabel, 
+        `${statusIcon} ${channel.toUpperCase()}${quality?.quality ? ` (${quality.quality})` : ''}`, 
         5, 
         channelY - channelHeight * 0.4 + 15
       );
