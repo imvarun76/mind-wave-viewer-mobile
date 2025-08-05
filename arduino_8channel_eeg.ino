@@ -25,28 +25,7 @@ unsigned long lastPush = 0;
 const unsigned long PUSH_INTERVAL = 1000; // ms
 float eegData[8] = {0};  // Filtered EEG values for all 8 channels
 
-// Moving average filter class
-class MovingAverage {
-  private:
-    float buffer[16];
-    int index = 0;
-    int count = 0;
-    
-  public:
-    float addValue(float value) {
-      buffer[index] = value;
-      index = (index + 1) % 16;
-      if (count < 16) count++;
-
-      float sum = 0;
-      for (int i = 0; i < count; i++) {
-        sum += buffer[i];
-      }
-      return sum / count;
-    }
-};
-
-MovingAverage eegFilter[8];  // 1 filter per channel (all 8 channels)
+// No filtering - raw EEG data for natural zig-zag patterns
 
 // Smoothed ADC read with proper scaling
 float readCleanEEG(int pin, int samples = 16) {
@@ -118,11 +97,9 @@ void setup() {
 }
 
 void loop() {
-  // Read and filter all 8 channels
+  // Read raw EEG data without filtering for natural zig-zag patterns
   for (int i = 0; i < channelCount; i++) {
-    float raw = readCleanEEG(eegPins[i]);
-    float filtered = eegFilter[i].addValue(raw);
-    eegData[i] = filtered;
+    eegData[i] = readCleanEEG(eegPins[i]);
   }
 
   // Print all channel data

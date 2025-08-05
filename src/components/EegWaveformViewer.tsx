@@ -35,7 +35,7 @@ const EegWaveformViewer = () => {
     ch8: true,
   });
   
-  const [smoothing, setSmoothing] = useState<'none' | 'low' | 'medium' | 'high'>('medium');
+  const [smoothing, setSmoothing] = useState<'none' | 'low' | 'medium' | 'high'>('none');
   const [chartData, setChartData] = useState<Array<any>>([]);
   
   // Digital filtering state
@@ -186,23 +186,8 @@ const EegWaveformViewer = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex justify-between items-start gap-4">
-          <div className="flex items-center space-x-2">
-            <label htmlFor="smoothing" className="text-sm">Smoothing:</label>
-            <Select value={smoothing} onValueChange={(value: any) => setSmoothing(value)}>
-              <SelectTrigger className="w-24 h-8">
-                <SelectValue placeholder="Medium" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex-1 max-w-xs">
+        <div className="mb-4 flex justify-end items-start">
+          <div className="max-w-xs">
             <FilterControls
               filterConfig={filterConfig}
               onFilterChange={setFilterConfig}
