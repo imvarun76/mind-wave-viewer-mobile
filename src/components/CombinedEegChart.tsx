@@ -38,24 +38,25 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
 }) => {
   // Get visible channels in order
   const visibleChannelKeys = Object.keys(visibleChannels).filter(key => visibleChannels[key]);
-  const channelSpacing = 1; // Space between channel baselines
+  const channelSpacing = 100; // Much larger spacing between channels like in professional EEG
   
-  // Transform data to separate each channel into its own Y-space
+  // Transform data to separate each channel into its own Y-space with proper baselines
   const transformedData = data.map(point => {
     const result = { time: point.time };
     
     visibleChannelKeys.forEach((channelKey, index) => {
-      const channelValue = point[channelKey] || 0;
-      // Scale the signal amplitude and offset each channel to its own baseline
+      const rawValue = point[channelKey] || 0;
+      // Create baseline for each channel (higher index = higher on screen)
       const baseline = (visibleChannelKeys.length - 1 - index) * channelSpacing;
-      const scaledAmplitude = (channelValue - 1650000) * 0.00001; // Adjust scale to make signals visible
-      result[channelKey] = baseline + scaledAmplitude;
+      // Scale the signal amplitude to be visible but not overlap (typical EEG range)
+      const signalAmplitude = (rawValue - 1650000) * 0.001; // Adjust for visible EEG-like waves
+      result[channelKey] = baseline + signalAmplitude;
     });
     
     return result;
   });
 
-  // Create Y-axis ticks for channel labels
+  // Create Y-axis ticks for channel labels at each baseline
   const channelTicks = visibleChannelKeys.map((_, index) => 
     (visibleChannelKeys.length - 1 - index) * channelSpacing
   );
@@ -97,7 +98,7 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4">
-        <div className="h-[400px] w-full bg-gray-800 rounded-lg p-4">
+        <div className="h-[600px] w-full bg-gray-800 rounded-lg p-4">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={transformedData}
@@ -118,11 +119,12 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
                 tickLine={false}
               />
               <YAxis 
-                domain={[-0.5, visibleChannelKeys.length - 0.5]}
+                domain={[-50, (visibleChannelKeys.length - 1) * channelSpacing + 50]}
                 ticks={channelTicks}
                 tickFormatter={(value) => {
-                  const channelIndex = visibleChannelKeys.length - 1 - Math.round(value / channelSpacing);
-                  const channelKey = visibleChannelKeys[channelIndex];
+                  const channelIndex = Math.round(value / channelSpacing);
+                  const reversedIndex = visibleChannelKeys.length - 1 - channelIndex;
+                  const channelKey = visibleChannelKeys[reversedIndex];
                   return channelKey ? CHANNEL_LABELS[channelKey as keyof typeof CHANNEL_LABELS] : '';
                 }}
                 stroke="#9CA3AF" 
