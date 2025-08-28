@@ -36,6 +36,25 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
   visibleChannels,
   samplingRate = 250
 }) => {
+  // Transform data to separate each channel into its own Y-space
+  const transformedData = data.map(point => {
+    const result = { time: point.time };
+    let channelIndex = 0;
+    
+    Object.keys(visibleChannels).forEach(channelKey => {
+      if (visibleChannels[channelKey]) {
+        // Scale and offset each channel to its own Y-space
+        const channelValue = point[channelKey] || 0;
+        const scaledValue = channelValue * 0.01; // Scale down the amplitude
+        const offsetValue = scaledValue + (7 - channelIndex); // Offset each channel
+        result[channelKey] = offsetValue;
+        channelIndex++;
+      }
+    });
+    
+    return result;
+  });
+
   const renderCustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -45,32 +64,13 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
           </p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-xs" style={{ color: entry.color }}>
-              {CHANNEL_LABELS[entry.dataKey as keyof typeof CHANNEL_LABELS]}: {Math.round(entry.value * 100) / 100}μV
+              {CHANNEL_LABELS[entry.dataKey as keyof typeof CHANNEL_LABELS]}: {Math.round((entry.value - Math.floor(entry.value)) * 10000) / 100}μV
             </p>
           ))}
         </div>
       );
     }
     return null;
-  };
-
-  const renderCustomLegend = (props: any) => {
-    const { payload } = props;
-    return (
-      <div className="flex flex-wrap justify-center gap-4 mt-2">
-        {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-1">
-            <div 
-              className="w-3 h-3 rounded-sm" 
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-xs text-white font-medium">
-              {CHANNEL_LABELS[entry.dataKey as keyof typeof CHANNEL_LABELS]}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
   };
 
   return (
@@ -92,8 +92,8 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
         <div className="h-[400px] w-full bg-gray-800 rounded-lg p-4">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
-              data={data}
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              data={transformedData}
+              margin={{ top: 20, right: 30, left: 60, bottom: 40 }}
             >
               <XAxis 
                 dataKey="time" 
@@ -107,12 +107,25 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
                 axisLine={false}
+                tickLine={false}
               />
               <YAxis 
-                hide={true}
+                domain={[0, 8]}
+                ticks={[0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]}
+                tickFormatter={(value) => {
+                  const channelIndex = Math.round(7.5 - value);
+                  const visibleChannelKeys = Object.keys(visibleChannels).filter(key => visibleChannels[key]);
+                  const channelKey = visibleChannelKeys[channelIndex];
+                  return channelKey ? CHANNEL_LABELS[channelKey as keyof typeof CHANNEL_LABELS] : '';
+                }}
+                stroke="#9CA3AF" 
+                fontSize={12}
+                tick={{ fill: '#9CA3AF' }}
+                axisLine={{ stroke: '#9CA3AF' }}
+                tickLine={false}
+                width={50}
               />
               <Tooltip content={renderCustomTooltip} />
-              <Legend content={renderCustomLegend} />
               
               {Object.keys(visibleChannels).map((channelKey) => {
                 if (!visibleChannels[channelKey]) return null;
