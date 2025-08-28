@@ -95,11 +95,6 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
               data={data}
               margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
             >
-              <CartesianGrid 
-                strokeDasharray="1 1" 
-                stroke="#374151" 
-                opacity={0.3}
-              />
               <XAxis 
                 dataKey="time" 
                 type="number"
@@ -111,17 +106,10 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
                 stroke="#9CA3AF" 
                 fontSize={10}
                 tick={{ fill: '#9CA3AF' }}
+                axisLine={false}
               />
               <YAxis 
-                stroke="#9CA3AF" 
-                fontSize={10}
-                tick={{ fill: '#9CA3AF' }}
-                label={{ 
-                  value: 'Amplitude (μV)', 
-                  angle: -90, 
-                  position: 'insideLeft',
-                  style: { textAnchor: 'middle', fill: '#9CA3AF' }
-                }}
+                hide={true}
               />
               <Tooltip content={renderCustomTooltip} />
               <Legend content={renderCustomLegend} />
