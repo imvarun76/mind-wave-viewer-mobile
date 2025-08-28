@@ -36,24 +36,29 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
   visibleChannels,
   samplingRate = 250
 }) => {
+  // Get visible channels in order
+  const visibleChannelKeys = Object.keys(visibleChannels).filter(key => visibleChannels[key]);
+  const channelSpacing = 1; // Space between channel baselines
+  
   // Transform data to separate each channel into its own Y-space
   const transformedData = data.map(point => {
     const result = { time: point.time };
-    let channelIndex = 0;
     
-    Object.keys(visibleChannels).forEach(channelKey => {
-      if (visibleChannels[channelKey]) {
-        // Scale and offset each channel to its own Y-space
-        const channelValue = point[channelKey] || 0;
-        const scaledValue = channelValue * 0.01; // Scale down the amplitude
-        const offsetValue = scaledValue + (7 - channelIndex); // Offset each channel
-        result[channelKey] = offsetValue;
-        channelIndex++;
-      }
+    visibleChannelKeys.forEach((channelKey, index) => {
+      const channelValue = point[channelKey] || 0;
+      // Scale the signal amplitude and offset each channel to its own baseline
+      const baseline = (visibleChannelKeys.length - 1 - index) * channelSpacing;
+      const scaledAmplitude = (channelValue - 1650000) * 0.00001; // Adjust scale to make signals visible
+      result[channelKey] = baseline + scaledAmplitude;
     });
     
     return result;
   });
+
+  // Create Y-axis ticks for channel labels
+  const channelTicks = visibleChannelKeys.map((_, index) => 
+    (visibleChannelKeys.length - 1 - index) * channelSpacing
+  );
 
   const renderCustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -62,11 +67,14 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
           <p className="text-xs font-medium mb-2">
             Time: {new Date(label).toLocaleTimeString()}
           </p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-xs" style={{ color: entry.color }}>
-              {CHANNEL_LABELS[entry.dataKey as keyof typeof CHANNEL_LABELS]}: {Math.round((entry.value - Math.floor(entry.value)) * 10000) / 100}μV
-            </p>
-          ))}
+          {payload.map((entry: any, index: number) => {
+            const originalValue = data.find(d => d.time === entry.payload.time)?.[entry.dataKey] || 0;
+            return (
+              <p key={index} className="text-xs" style={{ color: entry.color }}>
+                {CHANNEL_LABELS[entry.dataKey as keyof typeof CHANNEL_LABELS]}: {Math.round(originalValue)}μV
+              </p>
+            );
+          })}
         </div>
       );
     }
@@ -110,11 +118,10 @@ const CombinedEegChart: React.FC<CombinedEegChartProps> = ({
                 tickLine={false}
               />
               <YAxis 
-                domain={[0, 8]}
-                ticks={[0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]}
+                domain={[-0.5, visibleChannelKeys.length - 0.5]}
+                ticks={channelTicks}
                 tickFormatter={(value) => {
-                  const channelIndex = Math.round(7.5 - value);
-                  const visibleChannelKeys = Object.keys(visibleChannels).filter(key => visibleChannels[key]);
+                  const channelIndex = visibleChannelKeys.length - 1 - Math.round(value / channelSpacing);
                   const channelKey = visibleChannelKeys[channelIndex];
                   return channelKey ? CHANNEL_LABELS[channelKey as keyof typeof CHANNEL_LABELS] : '';
                 }}
