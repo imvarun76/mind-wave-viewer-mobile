@@ -41,7 +41,6 @@ export function Footer() {
             )}
           >
             <item.icon className="h-5 w-5" />
-            <span className="text-xs mt-1">{item.label}</span>
           </Link>
         ))}
       </nav>
