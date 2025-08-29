@@ -15,11 +15,6 @@ export function Footer() {
       icon: Home,
     },
     {
-      label: "Signal Viewer",
-      href: "/viewer",
-      icon: Activity,
-    },
-    {
       label: "Settings",
       href: "/settings/connection",
       icon: Settings,
