@@ -7,7 +7,7 @@ import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import SingleChannelChart from './SingleChannelChart';
-import CombinedEegChart from './CombinedEegChart';
+import ClinicalEEGMontage from './ClinicalEEGMontage';
 import FilterControls from './FilterControls';
 import { FilterConfig, applyFilter, getPresetFilterConfigs } from '@/utils/signalFilters';
 
@@ -214,7 +214,7 @@ const EegWaveformViewer = () => {
         ) : (
           <div>
             {/* Combined EEG Chart */}
-            <CombinedEegChart 
+            <ClinicalEEGMontage 
               data={processedData}
               visibleChannels={visibleChannels}
               samplingRate={samplingRate}
