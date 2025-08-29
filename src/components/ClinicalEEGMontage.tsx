@@ -196,7 +196,7 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
       }
     });
     
-    // Draw time axis labels (bottom only)
+    // Draw time axis labels
     ctx.fillStyle = isDarkTheme ? '#d1d5db' : '#6b7280';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
