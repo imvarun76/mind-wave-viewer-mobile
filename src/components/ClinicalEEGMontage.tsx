@@ -90,14 +90,13 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
   const getWindowData = useCallback(() => {
     if (!data.length) return [];
     
-    const now = Date.now();
-    const windowMs = timeWindow * 1000;
-    const startTime = now - windowMs;
+    // For real-time ESP32 data, just take the most recent samples
+    // ESP32 sends millis() timestamps, not real time
+    const maxSamples = timeWindow * samplingRate;
     
     return data
-      .filter(point => point.time >= startTime)
       .sort((a, b) => a.time - b.time)
-      .slice(-timeWindow * samplingRate); // Limit to prevent overflow
+      .slice(-maxSamples); // Keep most recent samples
   }, [data, timeWindow, samplingRate]);
 
   // Draw the EEG montage
@@ -170,7 +169,9 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
       // Get channel data and apply filters
       const channelData = windowData.map(point => {
         const rawValue = point[channelConfig.key] || 0;
-        return (rawValue - 1650000) * 0.001; // Convert to µV scale
+        // Convert ESP32 ADC values (0-4095) to µV range for EEG visualization
+        // Center around 0 and scale appropriately
+        return (rawValue - 700) * 10; // Scale to µV range suitable for EEG
       });
       
       const filteredData = applyFilters(channelData);
@@ -182,8 +183,8 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
         ctx.beginPath();
         
         for (let i = 0; i < filteredData.length; i++) {
-          const timeMs = windowData[i].time;
-          const x = LEFT_MARGIN + ((timeMs - startTime) / 1000) * pxPerSecond;
+          // For ESP32 millis() timestamps, use sample index for time positioning
+          const x = LEFT_MARGIN + (i / filteredData.length) * chartWidth;
           const y = baseline - (filteredData[i] * uVToPx);
           
           if (i === 0) {
