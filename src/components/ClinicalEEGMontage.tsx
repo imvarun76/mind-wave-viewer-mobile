@@ -169,12 +169,9 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
       // Get channel data and apply filters
       const channelData = windowData.map(point => {
         const rawValue = point[channelConfig.key] || 0;
-        // Match ESP32 conversion: analogRead(SIG) * (3.3 / 4095.0)
-        // If ESP32 sends voltage values (0-3.3V), scale for EEG visualization
-        // If ESP32 sends raw ADC (0-4095), convert to voltage first
-        const voltage = rawValue > 10 ? (rawValue * 3.3) / 4095.0 : rawValue; // Handle both cases
-        // Convert to µV and center around baseline (like LCD display)
-        return (voltage - 1.65) * 1000000; // Center around 1.65V midpoint, convert to µV
+        // Convert ESP32 ADC values (0-4095) to µV range for EEG visualization
+        // Center around 0 and scale appropriately
+        return (rawValue - 700) * 10; // Scale to µV range suitable for EEG
       });
       
       const filteredData = applyFilters(channelData);
