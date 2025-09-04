@@ -124,6 +124,32 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
       .slice(-maxSamples);
   }, [data, timeWindow, samplingRate]);
 
+  // Generate test data if no real data available (for visualization)
+  const getTestData = useCallback(() => {
+    const testPoints = [];
+    const pointCount = 200;
+    const now = Date.now();
+    
+    for (let i = 0; i < pointCount; i++) {
+      const t = i / 50; // 50 points per second
+      const point: any = { time: now - (pointCount - i) * 20 };
+      
+      CLINICAL_CHANNELS.forEach((config, channelIndex) => {
+        // Generate different waveforms for each channel (like LCD does)
+        const freq = 8 + channelIndex; // Different frequencies
+        const amplitude = 0.1 + (channelIndex * 0.02);
+        const offset = 1.65; // Center around 1.65V
+        const noise = (Math.random() - 0.5) * 0.05;
+        
+        point[config.key] = offset + Math.sin(2 * Math.PI * freq * t) * amplitude + noise;
+      });
+      
+      testPoints.push(point);
+    }
+    
+    return testPoints;
+  }, []);
+
   // Draw the EEG montage
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -146,8 +172,12 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
     ctx.fillStyle = isDarkTheme ? '#1f2937' : '#ffffff';
     ctx.fillRect(0, 0, width, height);
     
-    const windowData = getWindowData();
-    if (windowData.length === 0) return;
+    let windowData = getWindowData();
+    
+    // If no real data, show test data for visualization
+    if (windowData.length === 0) {
+      windowData = getTestData();
+    }
     
     const pxPerSecond = chartWidth / timeWindow;
     const uVToPx = GRID_DIV_HEIGHT / sensitivity;
@@ -191,29 +221,29 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
       ctx.textBaseline = 'middle';
       ctx.fillText(channelConfig.label, LEFT_MARGIN - 10, baseline);
       
-      // Get channel data and apply filters
+      // Get channel data and convert like LCD display
       const channelData = windowData.map(point => {
-        const rawValue = point[channelConfig.key] || 0;
-        // Match ESP32 conversion: analogRead(SIG) * (3.3 / 4095.0)
-        // If ESP32 sends voltage values (0-3.3V), scale for EEG visualization
-        // If ESP32 sends raw ADC (0-4095), convert to voltage first
-        const voltage = rawValue > 10 ? (rawValue * 3.3) / 4095.0 : rawValue; // Handle both cases
-        // Convert to µV and center around baseline (like LCD display)
-        return (voltage - 1.65) * 1000000; // Center around 1.65V midpoint, convert to µV
+        const rawValue = point[channelConfig.key] || 1.65; // Default to center voltage
+        
+        // Convert exactly like LCD: map voltage to display range
+        // LCD: map((int)(input_data[prevSampleIndex][i] * 1000), 0, 3300, 0, spacing)
+        const voltageMillivolts = rawValue * 1000; // Convert to millivolts
+        const mappedValue = ((voltageMillivolts - 0) / (3300 - 0)) * (ROW_HEIGHT * 0.8); // Map to 80% of row height
+        
+        return mappedValue - (ROW_HEIGHT * 0.4); // Center around baseline
       });
       
       const filteredData = applyFilters(channelData);
       
-      // Draw waveform
+      // Draw waveform like LCD (continuous lines between points)
       if (filteredData.length > 1) {
         ctx.strokeStyle = channelConfig.color;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 2; // Slightly thicker like LCD
         ctx.beginPath();
         
         for (let i = 0; i < filteredData.length; i++) {
-          // For ESP32 millis() timestamps, use sample index for time positioning
-          const x = LEFT_MARGIN + (i / filteredData.length) * chartWidth;
-          const y = baseline - (filteredData[i] * uVToPx);
+          const x = LEFT_MARGIN + (i / (filteredData.length - 1)) * chartWidth;
+          const y = baseline + filteredData[i]; // Add to baseline
           
           if (i === 0) {
             ctx.moveTo(x, y);
@@ -237,7 +267,7 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
       ctx.fillText(timeLabel, x, height - BOTTOM_MARGIN + 5);
     }
     
-  }, [visibleChannelConfigs, channelCount, timeWindow, sensitivity, filters, isDarkTheme, getWindowData, applyFilters]);
+  }, [visibleChannelConfigs, channelCount, timeWindow, sensitivity, filters, isDarkTheme, getWindowData, getTestData, applyFilters]);
 
   // Animation loop
   useEffect(() => {
@@ -372,7 +402,8 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
         </div>
         
         <div className="mt-2 text-xs text-muted-foreground text-center">
-          Clinical EEG Montage • {data.length} samples • Real-time monitoring
+          Clinical EEG Montage • Test data displayed • 
+          {data.length === 0 ? "Showing test waveforms" : "Real-time monitoring"}
         </div>
       </CardContent>
     </Card>
