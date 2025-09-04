@@ -86,17 +86,42 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
     return filtered;
   }, [filters, samplingRate]);
 
-  // Get processed data for time window
+  // Get processed data for time window - now supports batch data
   const getWindowData = useCallback(() => {
     if (!data.length) return [];
     
-    // For real-time ESP32 data, just take the most recent samples
-    // ESP32 sends millis() timestamps, not real time
-    const maxSamples = timeWindow * samplingRate;
+    // Check if we have batch data in the latest entry
+    const latestData = data[data.length - 1];
+    if (latestData.channels && latestData.samples_count) {
+      // We have batch data! Convert it to point format for montage display
+      const sampleCount = latestData.samples_count;
+      const sampleRate = latestData.sample_rate || samplingRate;
+      const batchStart = latestData.batch_start || Date.now();
+      
+      const batchPoints = [];
+      for (let i = 0; i < sampleCount; i++) {
+        const timeMs = batchStart + (i * (1000 / sampleRate));
+        const point: any = { time: timeMs };
+        
+        // Add each channel's value for this time sample
+        CLINICAL_CHANNELS.forEach(config => {
+          const channelData = latestData.channels?.[config.key];
+          if (channelData && channelData[i] !== undefined) {
+            point[config.key] = channelData[i]; // Voltage values (0-3.3V)
+          }
+        });
+        
+        batchPoints.push(point);
+      }
+      
+      return batchPoints;
+    }
     
+    // Fallback to regular single-sample data
+    const maxSamples = timeWindow * samplingRate;
     return data
       .sort((a, b) => a.time - b.time)
-      .slice(-maxSamples); // Keep most recent samples
+      .slice(-maxSamples);
   }, [data, timeWindow, samplingRate]);
 
   // Draw the EEG montage

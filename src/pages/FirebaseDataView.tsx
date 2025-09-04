@@ -13,10 +13,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import PollingControls from '@/components/PollingControls';
 import EegWaveformViewer from '@/components/EegWaveformViewer';
+import BatchEegViewer from '@/components/BatchEegViewer';
 
 const FirebaseDataView = () => {
   const { data, rawTimeseriesData, isLoading, lastUpdated, refreshData } = useFirebaseData();
   const [showRawData, setShowRawData] = useState(false);
+  
+  // Default all channels visible for the batch viewer
+  const [visibleChannels] = useState({
+    ch1: true,
+    ch2: true, 
+    ch3: true,
+    ch4: true,
+    ch5: true,
+    ch6: true,
+    ch7: true,
+    ch8: true,
+  });
   
   return (
     <MobileLayout 
@@ -87,6 +100,8 @@ const FirebaseDataView = () => {
         </Card>
         
         <EegWaveformViewer />
+        
+        <BatchEegViewer visibleChannels={visibleChannels} />
         
         <PollingControls />
         

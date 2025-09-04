@@ -7,7 +7,7 @@ export type FirebaseEegData = {
   spo2?: number;
   temp?: number;
   timestamp?: number;
-  // Channel data in flat format (ch1, ch2, etc.)
+  // Channel data in flat format (ch1, ch2, etc.) - single values
   ch1?: number;
   ch2?: number;
   ch3?: number;
@@ -16,11 +16,15 @@ export type FirebaseEegData = {
   ch6?: number;
   ch7?: number;
   ch8?: number;
-  // Support for array format too
-  eeg?: number[][];  // For EEG data (array of channels, each with array of values)
+  // Batch data format from ESP32
+  batch_start?: number;
+  sample_rate?: number;
+  samples_count?: number;
   channels?: {
-    [key: string]: number[];  // Channel name to array of values
+    [key: string]: number[];  // Channel name to array of values for smooth waveforms
   };
+  // Support for legacy array format too
+  eeg?: number[][];  // For EEG data (array of channels, each with array of values)
 };
 
 // Define a type for timestamped data from Firebase
@@ -83,9 +87,10 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
         console.log('🧠 EEG Data received:', eegData);
         
         if (eegData) {
-          // Extract channel data from the ESP32 format
+          // Extract both single values and batch arrays from ESP32 format
           combinedData = {
             ...combinedData,
+            // Single channel values (latest sample)
             ch1: eegData.ch1,
             ch2: eegData.ch2,
             ch3: eegData.ch3,
@@ -94,6 +99,12 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
             ch6: eegData.ch6,
             ch7: eegData.ch7,
             ch8: eegData.ch8,
+            // Batch metadata
+            batch_start: eegData.batch_start,
+            sample_rate: eegData.sample_rate,
+            samples_count: eegData.samples_count,
+            // Channel arrays for smooth waveforms
+            channels: eegData.channels,
             timestamp: eegData.timestamp || Date.now(),
           };
         }
