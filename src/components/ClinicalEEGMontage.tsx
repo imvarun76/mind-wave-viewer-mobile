@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Download } from 'lucide-react';
+import { FilterConfig as SignalFilterConfig, applyFilter } from '@/utils/signalFilters';
+import { FirebaseTimestampedData } from '@/providers/FirebaseDataProvider';
 
 // Channel configuration matching clinical EEG standards
 const CLINICAL_CHANNELS = [
@@ -18,8 +20,9 @@ const CLINICAL_CHANNELS = [
 ];
 
 type ClinicalEEGMontageProps = {
-  data: any[];
+  data: FirebaseTimestampedData;
   visibleChannels: { [key: string]: boolean };
+  filterConfig?: SignalFilterConfig;
   samplingRate?: number;
 };
 
@@ -31,15 +34,15 @@ type FilterConfig = {
 const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
   data,
   visibleChannels,
+  filterConfig,
   samplingRate = 250
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   
-  // Control states
+  // Control states (simplified since we now get filter config as prop)
   const [sensitivity, setSensitivity] = useState(50); // µV/div
   const [timeWindow, setTimeWindow] = useState(20); // seconds
-  const [filters, setFilters] = useState<FilterConfig>({ bandpass: false, notch: 'off' });
   const [isDarkTheme, setIsDarkTheme] = useState(false);
 
   // Layout constants
@@ -57,41 +60,36 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
   // Calculate dimensions
   const chartHeight = channelCount * ROW_HEIGHT + TOP_MARGIN + BOTTOM_MARGIN;
   
-  // Apply simple filters
+  // Convert FirebaseTimestampedData to array format
+  const convertToArrayData = useCallback(() => {
+    if (!data || typeof data !== 'object') return [];
+    
+    const entries = Object.entries(data);
+    return entries.map(([timestamp, values]) => ({
+      time: parseInt(timestamp),
+      ...values
+    })).sort((a, b) => a.time - b.time);
+  }, [data]);
+  
+  // Apply filters using the proper filter system
   const applyFilters = useCallback((samples: number[]): number[] => {
-    if (!filters.bandpass && filters.notch === 'off') return samples;
+    if (!filterConfig || filterConfig.type === 'none') return samples;
     
-    // Simple high-pass filter for bandpass (0.5 Hz)
-    let filtered = [...samples];
-    if (filters.bandpass) {
-      const alpha = 0.98; // Simple high-pass coefficient
-      for (let i = 1; i < filtered.length; i++) {
-        filtered[i] = alpha * (filtered[i-1] + filtered[i] - samples[i-1]);
-      }
+    try {
+      return applyFilter(samples, filterConfig);
+    } catch (error) {
+      console.warn('Filter application failed:', error);
+      return samples;
     }
-    
-    // Simple notch filter (basic implementation)
-    if (filters.notch !== 'off') {
-      const notchFreq = parseInt(filters.notch);
-      const dt = 1 / samplingRate;
-      const omega = 2 * Math.PI * notchFreq * dt;
-      
-      // Very basic notch filter
-      for (let i = 2; i < filtered.length; i++) {
-        const avg = (filtered[i-2] + filtered[i]) / 2;
-        filtered[i-1] = filtered[i-1] * 0.9 + avg * 0.1;
-      }
-    }
-    
-    return filtered;
-  }, [filters, samplingRate]);
+  }, [filterConfig]);
 
   // Get processed data for time window - now supports batch data
   const getWindowData = useCallback(() => {
-    if (!data.length) return [];
+    const arrayData = convertToArrayData();
+    if (!arrayData.length) return [];
     
     // Check if we have batch data in the latest entry
-    const latestData = data[data.length - 1];
+    const latestData = arrayData[arrayData.length - 1];
     if (latestData.channels && latestData.samples_count) {
       // We have batch data! Convert it to point format for montage display
       const sampleCount = latestData.samples_count;
@@ -119,10 +117,8 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
     
     // Fallback to regular single-sample data
     const maxSamples = timeWindow * samplingRate;
-    return data
-      .sort((a, b) => a.time - b.time)
-      .slice(-maxSamples);
-  }, [data, timeWindow, samplingRate]);
+    return arrayData.slice(-maxSamples);
+  }, [convertToArrayData, timeWindow, samplingRate]);
 
   // Generate realistic EEG test data (like LCD display)
   const getTestData = useCallback(() => {
@@ -294,7 +290,7 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
       ctx.fillText(timeLabel, x, height - BOTTOM_MARGIN + 5);
     }
     
-  }, [visibleChannelConfigs, channelCount, timeWindow, sensitivity, filters, isDarkTheme, getWindowData, getTestData, applyFilters]);
+  }, [visibleChannelConfigs, channelCount, timeWindow, sensitivity, filterConfig, isDarkTheme, getWindowData, getTestData, applyFilters]);
 
   // Animation loop
   useEffect(() => {
@@ -383,32 +379,16 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
           
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium">Filter:</label>
-            <Select 
-              value={filters.bandpass ? 'bandpass' : 'off'} 
-              onValueChange={(v) => setFilters(prev => ({ ...prev, bandpass: v === 'bandpass' }))}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="off">Off</SelectItem>
-                <SelectItem value="bandpass">0.5-40 Hz</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="text-sm text-muted-foreground">
+              {!filterConfig || filterConfig.type === 'none' ? 'Off' : filterConfig.type.charAt(0).toUpperCase() + filterConfig.type.slice(1)}
+            </div>
           </div>
           
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Notch:</label>
-            <Select value={filters.notch} onValueChange={(v) => setFilters(prev => ({ ...prev, notch: v as any }))}>
-              <SelectTrigger className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="off">Off</SelectItem>
-                <SelectItem value="50">50 Hz</SelectItem>
-                <SelectItem value="60">60 Hz</SelectItem>
-              </SelectContent>
-            </Select>
+            <label className="text-sm font-medium">Status:</label>
+            <div className="text-sm text-muted-foreground">
+              {!filterConfig || filterConfig.type === 'none' ? 'No filtering' : 'Active'}
+            </div>
           </div>
           
           <Button onClick={exportCSV} size="sm" variant="outline">
@@ -432,7 +412,7 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
         
         <div className="mt-2 text-xs text-muted-foreground text-center">
           Clinical EEG Montage • Test data displayed • 
-          {data.length === 0 ? "Showing test waveforms" : "Real-time monitoring"}
+          {Object.keys(data).length === 0 ? "Showing test waveforms" : "Real-time monitoring"}
         </div>
       </CardContent>
     </Card>
