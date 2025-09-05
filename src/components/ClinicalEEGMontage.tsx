@@ -124,31 +124,58 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
       .slice(-maxSamples);
   }, [data, timeWindow, samplingRate]);
 
-  // Generate test data if no real data available (for visualization)
+  // Generate realistic EEG test data (like LCD display)
   const getTestData = useCallback(() => {
     const testPoints = [];
-    const pointCount = 200;
+    const pointCount = Math.floor(timeWindow * samplingRate); // More points for longer windows
     const now = Date.now();
     
     for (let i = 0; i < pointCount; i++) {
-      const t = i / 50; // 50 points per second
-      const point: any = { time: now - (pointCount - i) * 20 };
+      const t = i / samplingRate; // Time in seconds
+      const point: any = { time: now - (pointCount - i) * (1000 / samplingRate) };
       
       CLINICAL_CHANNELS.forEach((config, channelIndex) => {
-        // Generate different waveforms for each channel (like LCD does)
-        const freq = 8 + channelIndex; // Different frequencies
-        const amplitude = 0.1 + (channelIndex * 0.02);
-        const offset = 1.65; // Center around 1.65V
-        const noise = (Math.random() - 0.5) * 0.05;
+        // Generate realistic EEG-like waveforms with multiple frequency components
+        let signal = 0;
         
-        point[config.key] = offset + Math.sin(2 * Math.PI * freq * t) * amplitude + noise;
+        // Alpha waves (8-12 Hz) - dominant in most channels
+        const alphaFreq = 8 + (channelIndex * 0.5);
+        const alphaAmp = 0.08 + (Math.random() * 0.04);
+        signal += Math.sin(2 * Math.PI * alphaFreq * t) * alphaAmp;
+        
+        // Beta waves (13-30 Hz) - smaller amplitude
+        const betaFreq = 15 + (channelIndex * 2);
+        const betaAmp = 0.03 + (Math.random() * 0.02);
+        signal += Math.sin(2 * Math.PI * betaFreq * t) * betaAmp;
+        
+        // Theta waves (4-7 Hz) - occasional
+        const thetaFreq = 5 + (channelIndex * 0.3);
+        const thetaAmp = 0.05 + (Math.random() * 0.03);
+        signal += Math.sin(2 * Math.PI * thetaFreq * t) * thetaAmp;
+        
+        // Delta waves (0.5-4 Hz) - very slow components
+        const deltaFreq = 1 + (channelIndex * 0.2);
+        const deltaAmp = 0.06 + (Math.random() * 0.04);
+        signal += Math.sin(2 * Math.PI * deltaFreq * t) * deltaAmp;
+        
+        // Add realistic noise and artifacts
+        const noise = (Math.random() - 0.5) * 0.03;
+        const slowDrift = Math.sin(2 * Math.PI * 0.1 * t) * 0.02; // Very slow baseline drift
+        
+        // Occasional "spikes" to simulate artifacts
+        const spikeChance = Math.random();
+        const spike = spikeChance < 0.001 ? (Math.random() - 0.5) * 0.15 : 0;
+        
+        // Center around 1.65V with realistic EEG characteristics
+        const offset = 1.65;
+        point[config.key] = offset + signal + noise + slowDrift + spike;
       });
       
       testPoints.push(point);
     }
     
     return testPoints;
-  }, []);
+  }, [timeWindow, samplingRate]);
 
   // Draw the EEG montage
   const draw = useCallback(() => {
@@ -348,6 +375,8 @@ const ClinicalEEGMontage: React.FC<ClinicalEEGMontageProps> = ({
                 <SelectItem value="10">10s</SelectItem>
                 <SelectItem value="20">20s</SelectItem>
                 <SelectItem value="30">30s</SelectItem>
+                <SelectItem value="60">60s</SelectItem>
+                <SelectItem value="120">120s</SelectItem>
               </SelectContent>
             </Select>
           </div>
