@@ -11,8 +11,7 @@ import EegWaveformViewer from '@/components/EegWaveformViewer';
 import BatchEegViewer from '@/components/BatchEegViewer';
 import ClinicalEEGMontage from '@/components/ClinicalEEGMontage';
 import FilterControls from '@/components/FilterControls';
-import SessionRecordingControls from '@/components/SessionRecordingControls';
-import RecordingsList from '@/components/RecordingsList';
+import SimpleRecordingControls from '@/components/SimpleRecordingControls';
 import { FilterConfig } from '@/utils/signalFilters';
 
 const FirebaseDataView = () => {
@@ -87,7 +86,7 @@ const FirebaseDataView = () => {
 
         {/* Recording Controls and Polling */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <SessionRecordingControls />
+          <SimpleRecordingControls />
           <PollingControls />
         </div>
         
@@ -140,7 +139,7 @@ const FirebaseDataView = () => {
         <Tabs defaultValue="visualization" className="space-y-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="visualization">Data Visualization</TabsTrigger>
-            <TabsTrigger value="recordings">Session Recordings</TabsTrigger>
+            <TabsTrigger value="recordings">Recording Management</TabsTrigger>
           </TabsList>
           
           <TabsContent value="visualization" className="space-y-4">
@@ -199,7 +198,7 @@ const FirebaseDataView = () => {
           </TabsContent>
           
           <TabsContent value="recordings">
-            <RecordingsList />
+            <SimpleRecordingControls />
           </TabsContent>
         </Tabs>
       </div>

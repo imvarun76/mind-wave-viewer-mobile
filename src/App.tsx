@@ -16,7 +16,6 @@ import NotFound from "./pages/NotFound";
 import { NetworkProvider } from "./providers/NetworkProvider";
 import { EegDataProvider } from "./providers/EegDataProvider";
 import { FirebaseDataProvider } from "./providers/FirebaseDataProvider";
-import { RecordingProvider } from "./providers/RecordingProvider";
 
 const queryClient = new QueryClient();
 
@@ -44,7 +43,6 @@ const App = () => {
           <NetworkProvider>
             <EegDataProvider>
               <FirebaseDataProvider>
-                <RecordingProvider>
               <Toaster />
               <Sonner />
               <BrowserRouter>
@@ -57,7 +55,6 @@ const App = () => {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 </BrowserRouter>
-                </RecordingProvider>
               </FirebaseDataProvider>
             </EegDataProvider>
           </NetworkProvider>
