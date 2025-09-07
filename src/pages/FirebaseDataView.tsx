@@ -1,21 +1,18 @@
-
 import React, { useState } from 'react';
 import { useFirebaseData } from '@/providers/FirebaseDataProvider';
 import MobileLayout from '@/components/MobileLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefreshCw, Heart, ThermometerSun, ChevronDown, ChevronUp } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import PollingControls from '@/components/PollingControls';
 import EegWaveformViewer from '@/components/EegWaveformViewer';
 import BatchEegViewer from '@/components/BatchEegViewer';
 import ClinicalEEGMontage from '@/components/ClinicalEEGMontage';
 import FilterControls from '@/components/FilterControls';
+import SessionRecordingControls from '@/components/SessionRecordingControls';
+import RecordingsList from '@/components/RecordingsList';
 import { FilterConfig } from '@/utils/signalFilters';
 
 const FirebaseDataView = () => {
@@ -67,7 +64,7 @@ const FirebaseDataView = () => {
   
   return (
     <MobileLayout 
-      title="Firebase Data" 
+      title="Firebase EEG Data" 
       showBack={true}
       rightAction={
         <Button 
@@ -86,6 +83,12 @@ const FirebaseDataView = () => {
           {lastUpdated && (
             <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
           )}
+        </div>
+
+        {/* Recording Controls and Polling */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <SessionRecordingControls />
+          <PollingControls />
         </div>
         
         <Card>
@@ -132,59 +135,73 @@ const FirebaseDataView = () => {
             </div>
           </CardContent>
         </Card>
-        
-        <div className="grid lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-3">
-            <ClinicalEEGMontage 
-              data={rawTimeseriesData} 
-              visibleChannels={visibleChannels}
-              filterConfig={filterConfig}
-              samplingRate={250}
-            />
-          </div>
-          <div className="lg:col-span-1">
+
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="visualization" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="visualization">Data Visualization</TabsTrigger>
+            <TabsTrigger value="recordings">Session Recordings</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="visualization" className="space-y-4">
+            {/* Filter Controls */}
             <FilterControls
               filterConfig={filterConfig}
               onFilterChange={setFilterConfig}
               presetOptions={filterPresets}
             />
-          </div>
-        </div>
-        
-        <EegWaveformViewer />
-        
-        <BatchEegViewer visibleChannels={visibleChannels} />
-        
-        <PollingControls />
-        
-        <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Raw Data</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => setShowRawData(!showRawData)}
-            >
-              {showRawData ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
+
+            {/* EEG Visualizations */}
+            <div className="grid lg:grid-cols-4 gap-4">
+              <div className="lg:col-span-4">
+                <ClinicalEEGMontage 
+                  data={rawTimeseriesData} 
+                  visibleChannels={visibleChannels}
+                  filterConfig={filterConfig}
+                  samplingRate={250}
+                />
+              </div>
+            </div>
+            
+            <EegWaveformViewer />
+            
+            <BatchEegViewer visibleChannels={visibleChannels} />
+            
+            {/* Raw Data Section */}
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-lg">Raw Data</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setShowRawData(!showRawData)}
+                >
+                  {showRawData ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </Button>
+              </CardHeader>
+              {showRawData && (
+                <CardContent>
+                  <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
+                    {isLoading ? (
+                      <Skeleton className="h-20 w-full" />
+                    ) : (
+                      JSON.stringify(rawTimeseriesData, null, 2)
+                    )}
+                  </pre>
+                </CardContent>
               )}
-            </Button>
-          </CardHeader>
-          {showRawData && (
-            <CardContent>
-              <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
-                {isLoading ? (
-                  <Skeleton className="h-20 w-full" />
-                ) : (
-                  JSON.stringify(rawTimeseriesData, null, 2)
-                )}
-              </pre>
-            </CardContent>
-          )}
-        </Card>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="recordings">
+            <RecordingsList />
+          </TabsContent>
+        </Tabs>
       </div>
     </MobileLayout>
   );
