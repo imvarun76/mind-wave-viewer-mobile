@@ -213,13 +213,6 @@ const EegWaveformViewer = () => {
           </div>
         ) : (
           <div>
-            {/* Combined EEG Chart */}
-            <ClinicalEEGMontage 
-              data={rawTimeseriesData}
-              visibleChannels={visibleChannels}
-              samplingRate={samplingRate}
-            />
-            
             {/* Individual Channel Charts */}
             {channelData.map((channel) => (
               <SingleChannelChart

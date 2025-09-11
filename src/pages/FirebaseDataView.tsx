@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefreshCw, Heart, ThermometerSun, ChevronDown, ChevronUp } from 'lucide-react';
 import PollingControls from '@/components/PollingControls';
-import BatchEegViewer from '@/components/BatchEegViewer';
+import EegWaveformViewer from '@/components/EegWaveformViewer';
 import ClinicalEEGMontage from '@/components/ClinicalEEGMontage';
 import FilterControls from '@/components/FilterControls';
 import SimpleRecordingControls from '@/components/SimpleRecordingControls';
@@ -157,7 +157,7 @@ const FirebaseDataView = () => {
               samplingRate={250}
             />
             
-            <BatchEegViewer visibleChannels={visibleChannels} />
+            <EegWaveformViewer />
             
             {/* Raw Data Section */}
             <Card>
