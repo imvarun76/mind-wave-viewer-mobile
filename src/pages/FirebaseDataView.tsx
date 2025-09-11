@@ -7,7 +7,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefreshCw, Heart, ThermometerSun, ChevronDown, ChevronUp } from 'lucide-react';
 import PollingControls from '@/components/PollingControls';
-import EegWaveformViewer from '@/components/EegWaveformViewer';
 import BatchEegViewer from '@/components/BatchEegViewer';
 import ClinicalEEGMontage from '@/components/ClinicalEEGMontage';
 import FilterControls from '@/components/FilterControls';
@@ -151,18 +150,12 @@ const FirebaseDataView = () => {
             />
 
             {/* EEG Visualizations */}
-            <div className="grid lg:grid-cols-4 gap-4">
-              <div className="lg:col-span-4">
-                <ClinicalEEGMontage 
-                  data={rawTimeseriesData} 
-                  visibleChannels={visibleChannels}
-                  filterConfig={filterConfig}
-                  samplingRate={250}
-                />
-              </div>
-            </div>
-            
-            <EegWaveformViewer />
+            <ClinicalEEGMontage 
+              data={rawTimeseriesData} 
+              visibleChannels={visibleChannels}
+              filterConfig={filterConfig}
+              samplingRate={250}
+            />
             
             <BatchEegViewer visibleChannels={visibleChannels} />
             
