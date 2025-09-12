@@ -11,11 +11,14 @@ import EegWaveformViewer from '@/components/EegWaveformViewer';
 import ClinicalEEGMontage from '@/components/ClinicalEEGMontage';
 import FilterControls from '@/components/FilterControls';
 import SimpleRecordingControls from '@/components/SimpleRecordingControls';
+import BatchRecordingControls from '@/components/BatchRecordingControls';
+import RawEegViewer from '@/components/RawEegViewer';
 import { FilterConfig } from '@/utils/signalFilters';
 
 const FirebaseDataView = () => {
   const { data, rawTimeseriesData, isLoading, lastUpdated, refreshData } = useFirebaseData();
   const [showRawData, setShowRawData] = useState(false);
+  const [enableSmoothing, setEnableSmoothing] = useState(false);
   
   // Default all channels visible for the batch viewer
   const [visibleChannels] = useState({
@@ -136,9 +139,10 @@ const FirebaseDataView = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="visualization" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="visualization">Data Visualization</TabsTrigger>
-            <TabsTrigger value="recordings">Recording Management</TabsTrigger>
+            <TabsTrigger value="raw">Raw Data View</TabsTrigger>
+            <TabsTrigger value="recordings">Recordings</TabsTrigger>
           </TabsList>
           
           <TabsContent value="visualization" className="space-y-4">
@@ -158,11 +162,18 @@ const FirebaseDataView = () => {
             />
             
             <EegWaveformViewer filterConfig={filterConfig} />
+          </TabsContent>
+          
+          <TabsContent value="raw" className="space-y-4">
+            <RawEegViewer 
+              enableSmoothing={enableSmoothing}
+              onSmoothingChange={setEnableSmoothing}
+            />
             
-            {/* Raw Data Section */}
+            {/* Raw JSON Data Section */}
             <Card>
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Raw Data</CardTitle>
+                <CardTitle className="text-lg">Raw JSON Data</CardTitle>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -182,7 +193,7 @@ const FirebaseDataView = () => {
                     {isLoading ? (
                       <Skeleton className="h-20 w-full" />
                     ) : (
-                      JSON.stringify(rawTimeseriesData, null, 2)
+                      JSON.stringify(data, null, 2)
                     )}
                   </pre>
                 </CardContent>
@@ -190,8 +201,8 @@ const FirebaseDataView = () => {
             </Card>
           </TabsContent>
           
-          <TabsContent value="recordings">
-            <SimpleRecordingControls />
+          <TabsContent value="recordings" className="space-y-4">
+            <BatchRecordingControls />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,13 +1,45 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { toast } from '@/components/ui/use-toast';
 
+// Define the type for batch EEG data from firmware
+export type FirebaseEegBatch = {
+  ch1: number[];  // 256 float samples
+  ch2: number[];
+  ch3: number[];
+  ch4: number[];
+  ch5: number[];
+  ch6: number[];
+  ch7: number[];
+  ch8: number[];
+  timestamp_ms: number;
+  sampling_rate: number;
+  batch_size: number;
+};
+
+// Define the type for processed sample data
+export type ProcessedEegSample = {
+  timestamp: number;
+  ch1: number;
+  ch2: number;
+  ch3: number;
+  ch4: number;
+  ch5: number;
+  ch6: number;
+  ch7: number;
+  ch8: number;
+};
+
 // Define the type for the data we expect from Firebase
 export type FirebaseEegData = {
   hr?: number;
   spo2?: number;
   temp?: number;
   timestamp?: number;
-  // Channel data in flat format (ch1, ch2, etc.) - single values
+  // Current batch data
+  latestBatch?: FirebaseEegBatch;
+  // Processed samples for visualization
+  samples?: ProcessedEegSample[];
+  // Backward compatibility fields
   ch1?: number;
   ch2?: number;
   ch3?: number;
@@ -16,15 +48,12 @@ export type FirebaseEegData = {
   ch6?: number;
   ch7?: number;
   ch8?: number;
-  // Batch data format from ESP32
-  batch_start?: number;
+  channels?: {
+    [key: string]: number[];
+  };
   sample_rate?: number;
   samples_count?: number;
-  channels?: {
-    [key: string]: number[];  // Channel name to array of values for smooth waveforms
-  };
-  // Support for legacy array format too
-  eeg?: number[][];  // For EEG data (array of channels, each with array of values)
+  batch_start?: number;
 };
 
 // Define a type for timestamped data from Firebase
@@ -48,7 +77,7 @@ const FirebaseDataContext = createContext<FirebaseDataContextType | undefined>(u
 
 // Firebase URLs matching your ESP32 code
 const FIREBASE_BASE_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app';
-const EEG_SIGNALS_URL = `${FIREBASE_BASE_URL}/devices/eeg_signals.json`;
+const LATEST_BATCH_URL = `${FIREBASE_BASE_URL}/devices/esp32_001/latestBatch.json`;
 
 // Health data endpoints (keeping these separate as they might exist)
 const HEALTH_ENDPOINTS = {
@@ -66,50 +95,105 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [pollingInterval, setPollingInterval] = useState<number>(500); // Default to 500ms
   const [pollingId, setPollingId] = useState<number | null>(null);
 
-  // Function to fetch data from the ESP32's eeg_signals endpoint
+  // Function to process batch data into individual samples with timestamps
+  const processBatchData = (batch: FirebaseEegBatch): ProcessedEegSample[] => {
+    const samples: ProcessedEegSample[] = [];
+    const { timestamp_ms, sampling_rate, batch_size } = batch;
+    
+    for (let i = 0; i < batch_size; i++) {
+      const sampleTimestamp = timestamp_ms + i * (1000 / sampling_rate);
+      samples.push({
+        timestamp: sampleTimestamp,
+        ch1: batch.ch1[i] || 0,
+        ch2: batch.ch2[i] || 0,
+        ch3: batch.ch3[i] || 0,
+        ch4: batch.ch4[i] || 0,
+        ch5: batch.ch5[i] || 0,
+        ch6: batch.ch6[i] || 0,
+        ch7: batch.ch7[i] || 0,
+        ch8: batch.ch8[i] || 0,
+      });
+    }
+    
+    return samples;
+  };
+
+  // Function to convert batch data for visualization (backward compatibility)
+  const getVisualizationData = (data: FirebaseEegData) => {
+    if (!data.samples || data.samples.length === 0) {
+      return {
+        ch1: 0, ch2: 0, ch3: 0, ch4: 0, ch5: 0, ch6: 0, ch7: 0, ch8: 0,
+        channels: { ch1: [], ch2: [], ch3: [], ch4: [], ch5: [], ch6: [], ch7: [], ch8: [] },
+        sample_rate: 256,
+        samples_count: 0,
+        batch_start: 0
+      };
+    }
+    
+    // Get latest values for single channel display
+    const latestSample = data.samples[data.samples.length - 1];
+    
+    // Create channel arrays for waveform display
+    const channels = {
+      ch1: data.samples.map(s => s.ch1),
+      ch2: data.samples.map(s => s.ch2), 
+      ch3: data.samples.map(s => s.ch3),
+      ch4: data.samples.map(s => s.ch4),
+      ch5: data.samples.map(s => s.ch5),
+      ch6: data.samples.map(s => s.ch6),
+      ch7: data.samples.map(s => s.ch7),
+      ch8: data.samples.map(s => s.ch8),
+    };
+    
+    return {
+      ch1: latestSample.ch1,
+      ch2: latestSample.ch2,
+      ch3: latestSample.ch3,
+      ch4: latestSample.ch4,
+      ch5: latestSample.ch5,
+      ch6: latestSample.ch6,
+      ch7: latestSample.ch7,
+      ch8: latestSample.ch8,
+      channels,
+      sample_rate: data.latestBatch?.sampling_rate || 256,
+      samples_count: data.samples.length,
+      batch_start: data.latestBatch?.timestamp_ms || Date.now()
+    };
+  };
+
+  // Function to fetch data from the ESP32's latest batch endpoint
   const fetchData = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      console.log('🔄 Fetching EEG data from:', EEG_SIGNALS_URL);
+      console.log('🔄 Fetching EEG batch data from:', LATEST_BATCH_URL);
       
-      // Fetch EEG signals data
-      const eegResponse = await fetch(EEG_SIGNALS_URL);
-      console.log('📡 EEG Response status:', eegResponse.status);
+      // Fetch latest batch data
+      const batchResponse = await fetch(LATEST_BATCH_URL);
+      console.log('📡 Batch Response status:', batchResponse.status);
       
       let combinedData: FirebaseEegData = {
         timestamp: Date.now(),
       };
 
-      if (eegResponse.ok) {
-        const eegData = await eegResponse.json();
-        console.log('🧠 EEG Data received:', eegData);
+      if (batchResponse.ok) {
+        const batchData: FirebaseEegBatch = await batchResponse.json();
+        console.log('🧠 Batch Data received:', batchData);
         
-        if (eegData) {
-          // Extract both single values and batch arrays from ESP32 format
+        if (batchData && batchData.ch1 && batchData.timestamp_ms) {
+          // Process batch into individual samples
+          const samples = processBatchData(batchData);
+          
           combinedData = {
             ...combinedData,
-            // Single channel values (latest sample)
-            ch1: eegData.ch1,
-            ch2: eegData.ch2,
-            ch3: eegData.ch3,
-            ch4: eegData.ch4,
-            ch5: eegData.ch5,
-            ch6: eegData.ch6,
-            ch7: eegData.ch7,
-            ch8: eegData.ch8,
-            // Batch metadata
-            batch_start: eegData.batch_start,
-            sample_rate: eegData.sample_rate,
-            samples_count: eegData.samples_count,
-            // Channel arrays for smooth waveforms
-            channels: eegData.channels,
-            timestamp: eegData.timestamp || Date.now(),
+            latestBatch: batchData,
+            samples: samples,
+            timestamp: batchData.timestamp_ms,
           };
         }
       } else {
-        console.warn('⚠️ Failed to fetch EEG data:', eegResponse.status);
+        console.warn('⚠️ Failed to fetch EEG batch data:', batchResponse.status);
       }
 
       // Fetch health data in parallel (optional)
@@ -138,13 +222,14 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       console.log('📊 Combined data:', combinedData);
 
-      // Update current data
-      setData(combinedData);
+      // Update current data with visualization compatibility
+      const visualData = { ...combinedData, ...getVisualizationData(combinedData) };
+      setData(visualData);
 
       // Update timeseries data with the new data point
       const timestamp = Date.now().toString();
       setRawTimeseriesData(prev => {
-        const newTimeseries = { ...prev, [timestamp]: combinedData };
+        const newTimeseries = { ...prev, [timestamp]: visualData };
         
         // Keep only the last 100 data points to prevent memory issues
         const timestamps = Object.keys(newTimeseries).sort();
@@ -160,7 +245,7 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
       
       setLastUpdated(new Date());
-      return combinedData;
+      return visualData;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error('❌ Error fetching data:', errorMessage);
