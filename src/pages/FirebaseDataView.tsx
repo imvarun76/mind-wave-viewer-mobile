@@ -32,7 +32,7 @@ const FirebaseDataView = () => {
   // Filter configuration state
   const [filterConfig, setFilterConfig] = useState<FilterConfig>({
     type: 'none',
-    samplingRate: 250,
+    samplingRate: 256,
     lowCutoff: 0.5,
     highCutoff: 40,
     notchFreq: 50,
@@ -43,15 +43,15 @@ const FirebaseDataView = () => {
 
   // Filter presets
   const filterPresets: Record<string, FilterConfig> = {
-    none: { type: 'none', samplingRate: 250 },
-    'low-noise': { type: 'lowpass', samplingRate: 250, highCutoff: 40 },
-    'dc-remove': { type: 'highpass', samplingRate: 250, lowCutoff: 0.5 },
-    'eeg-band': { type: 'bandpass', samplingRate: 250, lowCutoff: 0.5, highCutoff: 40 },
-    'notch-50hz': { type: 'notch', samplingRate: 250, notchFreq: 50 },
-    'notch-60hz': { type: 'notch', samplingRate: 250, notchFreq: 60 },
+    none: { type: 'none', samplingRate: 256 },
+    'low-noise': { type: 'lowpass', samplingRate: 256, highCutoff: 40 },
+    'dc-remove': { type: 'highpass', samplingRate: 256, lowCutoff: 0.5 },
+    'eeg-band': { type: 'bandpass', samplingRate: 256, lowCutoff: 0.5, highCutoff: 40 },
+    'notch-50hz': { type: 'notch', samplingRate: 256, notchFreq: 50 },
+    'notch-60hz': { type: 'notch', samplingRate: 256, notchFreq: 60 },
     'advanced-clean': { 
       type: 'advanced', 
-      samplingRate: 250, 
+      samplingRate: 256, 
       lowCutoff: 0.5, 
       highCutoff: 40,
       enableDCBlock: true,
@@ -154,10 +154,10 @@ const FirebaseDataView = () => {
               data={rawTimeseriesData} 
               visibleChannels={visibleChannels}
               filterConfig={filterConfig}
-              samplingRate={250}
+              samplingRate={256}
             />
             
-            <EegWaveformViewer />
+            <EegWaveformViewer filterConfig={filterConfig} />
             
             {/* Raw Data Section */}
             <Card>

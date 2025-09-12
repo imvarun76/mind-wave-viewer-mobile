@@ -11,6 +11,11 @@ import ClinicalEEGMontage from './ClinicalEEGMontage';
 import FilterControls from './FilterControls';
 import { FilterConfig, applyFilter, getPresetFilterConfigs } from '@/utils/signalFilters';
 
+// Define component props
+interface EegWaveformViewerProps {
+  filterConfig?: FilterConfig;
+}
+
 // Define channel colors for consistent visualization
 const CHANNEL_COLORS = [
   "#FF5733", // Red-Orange
@@ -23,7 +28,7 @@ const CHANNEL_COLORS = [
   "#8B33FF", // Purple
 ];
 
-const EegWaveformViewer = () => {
+const EegWaveformViewer = ({ filterConfig: externalFilterConfig }: EegWaveformViewerProps) => {
   const { rawTimeseriesData, isLoading, lastUpdated } = useFirebaseData();
   const [visibleChannels, setVisibleChannels] = useState<{ [key: string]: boolean }>({
     ch1: true,
@@ -39,12 +44,15 @@ const EegWaveformViewer = () => {
   const [smoothing, setSmoothing] = useState<'none' | 'low' | 'medium' | 'high'>('none');
   const [chartData, setChartData] = useState<Array<any>>([]);
   
-  // Digital filtering state
-  const [samplingRate] = useState(250); // Assume 250Hz sampling rate
-  const [filterConfig, setFilterConfig] = useState<FilterConfig>({
+  // Digital filtering state - use external config if provided
+  const [samplingRate] = useState(256); // Fixed 256Hz sampling rate
+  const [internalFilterConfig, setInternalFilterConfig] = useState<FilterConfig>({
     type: 'none',
     samplingRate: samplingRate
   });
+  
+  // Use external filter config if provided, otherwise use internal
+  const filterConfig = externalFilterConfig || internalFilterConfig;
   
   const presetFilters = getPresetFilterConfigs(samplingRate);
   
@@ -188,13 +196,15 @@ const EegWaveformViewer = () => {
       </CardHeader>
       <CardContent>
         <div className="mb-4 flex justify-end items-start">
-          <div className="max-w-xs">
-            <FilterControls
-              filterConfig={filterConfig}
-              onFilterChange={setFilterConfig}
-              presetOptions={presetFilters}
-            />
-          </div>
+          {!externalFilterConfig && (
+            <div className="max-w-xs">
+              <FilterControls
+                filterConfig={internalFilterConfig}
+                onFilterChange={setInternalFilterConfig}
+                presetOptions={presetFilters}
+              />
+            </div>
+          )}
         </div>
         
         {isLoading && chartData.length === 0 ? (
