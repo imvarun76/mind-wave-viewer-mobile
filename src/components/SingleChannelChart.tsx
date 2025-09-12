@@ -76,6 +76,7 @@ const SingleChannelChart: React.FC<SingleChannelChartProps> = ({
                 fontSize={10}
               />
               <YAxis 
+                domain={[0, 3.5]}
                 stroke="#888888" 
                 fontSize={10}
               />
