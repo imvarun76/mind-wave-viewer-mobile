@@ -75,9 +75,9 @@ type FirebaseDataContextType = {
 // Create the context
 const FirebaseDataContext = createContext<FirebaseDataContextType | undefined>(undefined);
 
-// Firebase URLs matching your ESP32 code
+// Firebase URLs matching your ESP32 code  
 const FIREBASE_BASE_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app';
-const LATEST_BATCH_URL = `${FIREBASE_BASE_URL}/eeg_signals.json`;
+const LATEST_BATCH_URL = `${FIREBASE_BASE_URL}/devices/eeg_signals.json`;
 
 // Health data endpoints (keeping these separate as they might exist)
 const HEALTH_ENDPOINTS = {
@@ -179,26 +179,39 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (batchResponse.ok) {
         const batchData = await batchResponse.json();
-        console.log('🧠 Batch Data received:', batchData);
+        console.log('🧠 Raw Firebase Data received:', batchData);
+        console.log('🔍 Data keys:', Object.keys(batchData || {}));
         
-        if (batchData && batchData.ch1 && batchData.timestamp) {
+        if (batchData && batchData.ch1) {
           // Convert the Firebase structure to our expected batch format
           const convertedBatch: FirebaseEegBatch = {
-            ch1: batchData.ch1 || [],
-            ch2: batchData.ch2 || [],
-            ch3: batchData.ch3 || [],
-            ch4: batchData.ch4 || [],
-            ch5: batchData.ch5 || [],
-            ch6: batchData.ch6 || [],
-            ch7: batchData.ch7 || [],
-            ch8: batchData.ch8 || [],
-            timestamp_ms: batchData.timestamp * 1000, // Convert to milliseconds if needed
-            sampling_rate: 256, // Default sampling rate
-            batch_size: batchData.ch1 ? batchData.ch1.length : 256
+            ch1: Array.isArray(batchData.ch1) ? batchData.ch1 : Object.values(batchData.ch1 || {}),
+            ch2: Array.isArray(batchData.ch2) ? batchData.ch2 : Object.values(batchData.ch2 || {}),
+            ch3: Array.isArray(batchData.ch3) ? batchData.ch3 : Object.values(batchData.ch3 || {}),
+            ch4: Array.isArray(batchData.ch4) ? batchData.ch4 : Object.values(batchData.ch4 || {}),
+            ch5: Array.isArray(batchData.ch5) ? batchData.ch5 : Object.values(batchData.ch5 || {}),
+            ch6: Array.isArray(batchData.ch6) ? batchData.ch6 : Object.values(batchData.ch6 || {}),
+            ch7: Array.isArray(batchData.ch7) ? batchData.ch7 : Object.values(batchData.ch7 || {}),
+            ch8: Array.isArray(batchData.ch8) ? batchData.ch8 : Object.values(batchData.ch8 || {}),
+            timestamp_ms: batchData.timestamp ? (batchData.timestamp < 1000000000000 ? batchData.timestamp * 1000 : batchData.timestamp) : Date.now(),
+            sampling_rate: 256,
+            batch_size: Array.isArray(batchData.ch1) ? batchData.ch1.length : Object.keys(batchData.ch1 || {}).length
           };
+          
+          console.log('✅ Converted batch:', {
+            channelLengths: {
+              ch1: convertedBatch.ch1.length,
+              ch2: convertedBatch.ch2.length,
+              ch3: convertedBatch.ch3.length,
+              ch4: convertedBatch.ch4.length
+            },
+            timestamp_ms: convertedBatch.timestamp_ms,
+            batch_size: convertedBatch.batch_size
+          });
           
           // Process batch into individual samples
           const samples = processBatchData(convertedBatch);
+          console.log('📊 Processed samples count:', samples.length);
           
           combinedData = {
             ...combinedData,
@@ -206,6 +219,8 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
             samples: samples,
             timestamp: convertedBatch.timestamp_ms,
           };
+        } else {
+          console.warn('⚠️ No ch1 data found in batch response');
         }
       } else {
         console.warn('⚠️ Failed to fetch EEG batch data:', batchResponse.status);
