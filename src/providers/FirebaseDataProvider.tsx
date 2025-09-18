@@ -77,7 +77,7 @@ const FirebaseDataContext = createContext<FirebaseDataContextType | undefined>(u
 
 // Firebase URLs matching your ESP32 code
 const FIREBASE_BASE_URL = 'https://databaseeeg-default-rtdb.asia-southeast1.firebasedatabase.app';
-const LATEST_BATCH_URL = `${FIREBASE_BASE_URL}/devices/esp32_001/latestBatch.json`;
+const LATEST_BATCH_URL = `${FIREBASE_BASE_URL}/eeg_signals.json`;
 
 // Health data endpoints (keeping these separate as they might exist)
 const HEALTH_ENDPOINTS = {
@@ -178,18 +178,33 @@ export const FirebaseDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
       };
 
       if (batchResponse.ok) {
-        const batchData: FirebaseEegBatch = await batchResponse.json();
+        const batchData = await batchResponse.json();
         console.log('🧠 Batch Data received:', batchData);
         
-        if (batchData && batchData.ch1 && batchData.timestamp_ms) {
+        if (batchData && batchData.ch1 && batchData.timestamp) {
+          // Convert the Firebase structure to our expected batch format
+          const convertedBatch: FirebaseEegBatch = {
+            ch1: batchData.ch1 || [],
+            ch2: batchData.ch2 || [],
+            ch3: batchData.ch3 || [],
+            ch4: batchData.ch4 || [],
+            ch5: batchData.ch5 || [],
+            ch6: batchData.ch6 || [],
+            ch7: batchData.ch7 || [],
+            ch8: batchData.ch8 || [],
+            timestamp_ms: batchData.timestamp * 1000, // Convert to milliseconds if needed
+            sampling_rate: 256, // Default sampling rate
+            batch_size: batchData.ch1 ? batchData.ch1.length : 256
+          };
+          
           // Process batch into individual samples
-          const samples = processBatchData(batchData);
+          const samples = processBatchData(convertedBatch);
           
           combinedData = {
             ...combinedData,
-            latestBatch: batchData,
+            latestBatch: convertedBatch,
             samples: samples,
-            timestamp: batchData.timestamp_ms,
+            timestamp: convertedBatch.timestamp_ms,
           };
         }
       } else {
